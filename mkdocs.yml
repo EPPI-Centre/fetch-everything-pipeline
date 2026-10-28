@@ -35,6 +35,7 @@ theme:
 
 nav:
   - Overview: index.md
+  - API Reference: api.md
   - License: LICENSE.md
 
 markdown_extensions:
