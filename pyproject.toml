@@ -1,0 +1,26 @@
+[project]
+name = "fetch-everything-pipeline"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Harry Moss", email = "h.moss@ucl.ac.uk" }
+]
+requires-python = ">=3.14"
+
+dependencies = [
+    "fetch-everything-robot",
+]
+
+[project.scripts]
+fetch-everything = "fetch_everything_pipeline:main"
+
+[tool.uv.build-backend]
+module-root = "fetch-everything"
+
+[tool.uv.sources]
+fetch-everything-robot = { git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b9159e4120ca66f04818a36434e319d216b28b62" }
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
