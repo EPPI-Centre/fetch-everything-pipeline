@@ -1,5 +1,8 @@
 """Test suite for the fetch everything pipeline."""
 
+import pytest
+from fetch_everything_pipeline import main
+
 
 def test_simple():
     """
@@ -7,4 +10,5 @@ def test_simple():
 
     Remove this test when you add real tests to the suite.
     """
-    assert True
+    with pytest.raises(NotImplementedError):
+        main()
