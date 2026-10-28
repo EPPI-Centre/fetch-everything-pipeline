@@ -1,26 +1,51 @@
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
 [project]
 name = "fetch-everything-pipeline"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Harry Moss", email = "h.moss@ucl.ac.uk" }
+  {name = "Harry Moss", email = "h.moss@ucl.ac.uk"}
 ]
-requires-python = ">=3.14"
-
+requires-python = ">=3.13"
 dependencies = [
-    "fetch-everything-robot",
+  "fetch-everything-robot"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pre-commit>=4.7.0"
+]
+docs = [
+  "mkdocs",
+  "mkdocs-include-markdown-plugin",
+  "mkdocs-material",
+  "mkdocs-mermaid2-plugin>=1.2.1",
+  "mkdocstrings",
+  "mkdocstrings-python",
+  "pygments==2.21.0"
+]
+test = [
+  "pytest-asyncio>=1.3.0",
+  "pytest-cov>=6.2.1",
+  "pytest-mock>=3.14.1",
+  "uvloop>=0.21.0"
 ]
 
 [project.scripts]
 fetch-everything = "fetch_everything_pipeline:main"
 
+[tool.uv]
+exclude-dependencies = [
+  "ecdsa" # Required until https://github.com/mpdavis/python-jose/issues/390 is resolved
+]
+exclude-newer = "P5D"
+
 [tool.uv.build-backend]
 module-root = "fetch-everything"
 
 [tool.uv.sources]
-fetch-everything-robot = { git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b9159e4120ca66f04818a36434e319d216b28b62" }
-
-[build-system]
-requires = ["uv_build>=0.13.1,<0.14.0"]
-build-backend = "uv_build"
+fetch-everything-robot = {git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b9159e4120ca66f04818a36434e319d216b28b62"} # pragma: allowlist secret
