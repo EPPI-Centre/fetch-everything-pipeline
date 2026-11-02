@@ -36,7 +36,7 @@ test = [
 ]
 
 [project.scripts]
-fetch-everything = "fetch_everything_pipeline:main"
+fetch-pipeline = "fetch_everything_pipeline:main"
 
 [tool.mypy]
 explicit_package_bases = true
