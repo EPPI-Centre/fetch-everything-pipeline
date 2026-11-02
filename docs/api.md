@@ -1,3 +1,3 @@
 # API reference
 
-::: fetch-everything
+::: fetch_everything_pipeline
