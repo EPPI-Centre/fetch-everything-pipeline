@@ -9,6 +9,32 @@ from fetch_everything_pipeline.models import (
     PipelineResult,
     Status,
 )
+from fetch_everything_pipeline.settings import PipelineSettings
+
+
+@pytest.fixture
+def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PipelineSettings:
+    """
+    Build settings from a known environment with only MAILTO and OPENALEX_KEY set.
+
+    Runs in an empty temporary directory so no `.env` file is read, and clears
+    the other settings variables so the developer's shell can't leak in.
+
+    Returns:
+        PipelineSettings: Settings loaded from the patched environment.
+
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MAILTO", "pipeline@example.org")
+    monkeypatch.setenv("OPENALEX_KEY", "openalex-test-key")
+    monkeypatch.delenv("ELSEVIER_SCOPUS_KEY", raising=False)
+    monkeypatch.delenv("ELSEVIER_SCOPUS_INST_TOKEN", raising=False)
+    monkeypatch.delenv("SCOPUS_PROXY_URL", raising=False)
+    monkeypatch.delenv("DESTINY_REPOSITORY_URL", raising=False)
+    monkeypatch.delenv("STORAGE_BLOB_ACCOUNT", raising=False)
+    monkeypatch.delenv("STORAGE_BLOB_CONTAINER", raising=False)
+    monkeypatch.delenv("STORAGE_BLOB_ACCOUNT_KEY", raising=False)
+    return PipelineSettings()
 
 
 @pytest.fixture
