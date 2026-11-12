@@ -48,6 +48,9 @@ jobs:
   deploy:
     needs: docs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       pages: write
