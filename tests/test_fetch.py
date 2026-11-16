@@ -15,7 +15,6 @@ from fer.fetch_fulltext import (
 )
 from fer.fetching.core import BaseAuthError, DOIStudyCollection
 from pydantic import SecretStr, ValidationError
-from pytest_mock import MockerFixture
 
 from fetch_everything_pipeline.fetch import (
     FER_FETCH_ERRORS,
@@ -27,62 +26,7 @@ from fetch_everything_pipeline.fetch import (
 )
 from fetch_everything_pipeline.models import Status
 from fetch_everything_pipeline.settings import PipelineSettings
-
-FakeFetch = Callable[..., Awaitable[list[FullTextResult]]]
-
-
-def fake_fetch(
-    found: dict[str, str],
-    fail_on: frozenset[str] = frozenset(),
-    error_type: type[Exception] = OSError,
-) -> FakeFetch:
-    """
-    Build a stand-in for `get_many_fulltext_pdfs_cycling_apis`.
-
-    Args:
-        found (dict[str, str]): Normalised DOI to the source FER would report.
-        fail_on (frozenset[str]): Normalised DOIs whose chunk raises.
-        error_type (type[Exception]): The exception raised for `fail_on`.
-
-    Returns:
-        FakeFetch: An async function returning results in reverse order, as
-            FER doesn't preserve input order.
-
-    """
-
-    async def fetch(
-        input_study_collection: DOIStudyCollection, output_directory: Path, **_: object
-    ) -> list[FullTextResult]:
-        results = []
-        for study in input_study_collection.studies:
-            doi = study.doi.identifier
-            if doi in fail_on:
-                error_message = f"Error on {doi}"
-                raise error_type(error_message)
-            source = found.get(doi)
-            results.append(
-                FullTextResult(
-                    doi=doi,
-                    uid=str(study.uid),
-                    openalex_id=None,
-                    fulltext_path=(
-                        str(output_directory / f"{study.uid}.pdf") if source else None
-                    ),
-                    source=source,
-                )
-            )
-        return results[::-1]
-
-    return fetch
-
-
-@pytest.fixture
-def test_fetcher(mocker: MockerFixture) -> FullTextBatchFetcher:
-    mock = mocker.create_autospec(FullTextBatchFetcher, instance=True)
-    mock.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch({})
-    mock.full_text_fetcher = mocker.create_autospec(FullTextFetcher, instance=True)
-    mock.all_api_configs = {"fulltext": {api.name: {} for api in ExternalAPI}}
-    return mock
+from tests.fakes import mock_fetch
 
 
 @pytest.fixture
@@ -104,7 +48,7 @@ def chunks_passed(test_fetcher: FullTextBatchFetcher) -> list[list[str]]:
 async def test_fetch_fulltexts_one_result_per_input_in_input_order(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {"10.1000/a": "OPENALEX", "10.1000/c": "UNPAYWALL"}
     )
     dois = [
@@ -139,7 +83,7 @@ async def test_fetch_fulltexts_one_result_per_input_in_input_order(
 async def test_fetch_fulltexts_source_passed_through_from_fer(
     test_fetcher: FullTextBatchFetcher, output_dir: Path, source: ExternalAPI
 ):
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {"10.1000/a": source.name}
     )
 
@@ -154,7 +98,7 @@ async def test_fetch_fulltexts_source_passed_through_from_fer(
 async def test_fetch_fulltexts_duplicates_fetched_once_and_share_result(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {"10.1000/a": "CROSSREF"}
     )
 
@@ -180,7 +124,7 @@ async def test_fetch_fulltexts_failing_chunk_does_not_affect_other_chunks(
 
     ValidationError is excluded because it is raised for individual inputs, not the whole chunk.
     """
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {"10.1000/a": "OPENALEX", "10.1000/c": "OPENALEX"},
         fail_on=frozenset({"10.1000/b"}),
         error_type=error_type,
@@ -197,7 +141,7 @@ async def test_fetch_fulltexts_failing_chunk_does_not_affect_other_chunks(
 async def test_fetch_fulltexts_unexpected_exception_propagates(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {}, fail_on=frozenset({"10.1000/a"}), error_type=RuntimeError
     )
 
@@ -208,7 +152,7 @@ async def test_fetch_fulltexts_unexpected_exception_propagates(
 async def test_fetch_fulltexts_failing_chunk_marks_every_input_in_it(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {}, fail_on=frozenset({"10.1000/b"})
     )
 
@@ -248,7 +192,7 @@ async def test_fetch_fulltexts_unexpected_source_is_error(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     """FER reports `robot_title` for files already on disk; that isn't a provider."""
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
         {"10.1000/a": "Fetch Everything Robot (FER)"}
     )
 
