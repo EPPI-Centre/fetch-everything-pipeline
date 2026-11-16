@@ -210,11 +210,26 @@ async def test_failing_chunk_marks_every_input_in_it(
 
 
 async def test_chunks_unique_dois(fetcher: AsyncMock, output_dir: Path):
-    dois = [f"10.1000/{n}" for n in range(5)]
+    dois = [
+        "10.1000/0",
+        "not a doi",
+        "https://doi.org/10.1000/0",
+        "10.1000/1",
+        "10.1000/2",
+        "doi:10.1000/1",
+        "",
+        "10.1000/3",
+        "10.1000/A",
+        "10.1000/a",
+    ]
 
     await fetch_fulltexts(dois, output_dir, fetcher, chunk_size=2)
 
-    assert chunks_passed(fetcher) == [dois[0:2], dois[2:4], dois[4:5]]
+    assert chunks_passed(fetcher) == [
+        ["10.1000/0", "10.1000/1"],
+        ["10.1000/2", "10.1000/3"],
+        ["10.1000/a"],
+    ]
 
 
 async def test_unexpected_source_is_error(fetcher: AsyncMock, output_dir: Path):
