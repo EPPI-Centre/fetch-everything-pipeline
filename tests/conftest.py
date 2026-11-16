@@ -1,15 +1,71 @@
 """Define test configuration and fixtures."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from fer.config import ExternalAPI
+from fer.fetch_fulltext import FullTextBatchFetcher
+from loguru import logger
+from pytest_mock import MockerFixture
 
+from fetch_everything_pipeline.fetch import build_fetcher
 from fetch_everything_pipeline.models import (
     PipelineResult,
     Status,
 )
 from fetch_everything_pipeline.settings import PipelineSettings
+from tests.fakes import mock_fetch
+
+
+@pytest.fixture
+def caplog(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
+    """
+    Make pytest's `caplog` capture loguru messages.
+
+    Loguru doesn't use the standard `logging` module, so this adds a sink that
+    writes to `caplog.handler` for the duration of the test.
+
+    Args:
+        caplog (pytest.LogCaptureFixture): pytest's built-in fixture.
+
+    Yields:
+        pytest.LogCaptureFixture: The same fixture, now receiving loguru output.
+
+    """
+    handler_id = logger.add(
+        caplog.handler,
+        format="{message}",
+        level=0,
+        filter=lambda record: record["level"].no >= caplog.handler.level,
+        enqueue=False,
+    )
+    yield caplog
+    logger.remove(handler_id)
+
+
+@pytest.fixture
+def test_fetcher(
+    mocker: MockerFixture, test_settings: PipelineSettings
+) -> FullTextBatchFetcher:
+    """
+    Mock a `FullTextBatchFetcher` that finds nothing by default.
+
+    Args:
+        mocker (MockerFixture): The pytest-mock fixture.
+        test_settings (PipelineSettings): Settings the real fetcher is built
+            from.
+
+    Returns:
+        FullTextBatchFetcher: The mock with the side effect of
+            `get_many_fulltext_pdfs_cycling_apis` set to `mock_fetch` to change
+            what it finds.
+
+    """
+    mock = mocker.create_autospec(FullTextBatchFetcher, instance=True)
+    mock.all_api_configs = build_fetcher(test_settings).all_api_configs
+    mock.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch({})
+    return mock
 
 
 @pytest.fixture
