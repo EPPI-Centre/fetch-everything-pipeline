@@ -268,7 +268,7 @@ async def fetch_chunk(
             output_directory=output_dir,
         )
     except FER_FETCH_ERRORS as chunk_error:
-        logger.exception("Fetching a chunk of {} DOIs failed", len(chunk.studies))
+        logger.exception(f"Fetching a chunk of {len(chunk.studies)} DOIs failed")
         outcome = FetchOutcome(
             status=Status.ERROR, error=f"{type(chunk_error).__name__}: {chunk_error}"
         )
