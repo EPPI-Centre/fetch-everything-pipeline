@@ -6,6 +6,7 @@ import pytest
 from fer.fetch_fulltext import FullTextBatchFetcher
 from pytest_mock import MockerFixture
 
+import fetch_everything_pipeline
 from fetch_everything_pipeline import (
     PDF_DIR_NAME,
     RESULTS_FILE_NAME,
@@ -99,6 +100,13 @@ def test_parse_args_defaults_chunk_size():
     assert (
         args.chunk_size == DEFAULT_CHUNK_SIZE
     ), "should default chunk size to DEFAULT_CHUNK_SIZE"
+    assert not args.upload, "should default upload flag to False if not specified"
+
+
+def test_parse_args_upload_flag():
+    args = parse_args(["--input", "dois.txt", "--output", "out", "--upload"])
+
+    assert args.upload, "should set upload flag to True when specified"
 
 
 @pytest.mark.parametrize(
@@ -106,6 +114,7 @@ def test_parse_args_defaults_chunk_size():
     [
         ("--input", "dois.txt", "--output", "out", "--chunk-size", "5"),
         ("--input", "dois.txt", "--output", "out"),
+        ("--input", "dois.txt", "--output", "out", "--upload"),
     ],
 )
 def test_parse_args_reads_all_arguments(input_args: tuple[str, ...]):
@@ -114,7 +123,9 @@ def test_parse_args_reads_all_arguments(input_args: tuple[str, ...]):
     expected_chunk_size = (
         int(input_args[-1]) if "--chunk-size" in input_args else DEFAULT_CHUNK_SIZE
     )
+    expected_upload_flag = "--upload" in input_args
     assert args.chunk_size == expected_chunk_size, "should parse chunk size"
+    assert args.upload == expected_upload_flag, "should parse upload flag"
 
 
 @pytest.mark.parametrize(
@@ -124,6 +135,7 @@ def test_parse_args_reads_all_arguments(input_args: tuple[str, ...]):
         ["--input", "dois.txt"],
         ["--input", "a", "--output", "b", "--chunk-size", "0"],
         ["--input", "a", "--output", "b", "--chunk-size", "many"],
+        ["--input", "dois.txt", "--output", "out", "--upload=Twenty"],
     ],
 )
 def test_parse_args_rejects_bad_arguments(argv: list[str]):
@@ -136,17 +148,11 @@ def test_parse_args_rejects_bad_arguments(argv: list[str]):
     ), "should exit with the expected code for invalid arguments"
 
 
+@pytest.mark.usefixtures("cli_fetcher_with_pdf")
 def test_main_writes_results_for_every_input(
-    test_settings: PipelineSettings,
-    mocker: MockerFixture,
-    test_fetcher: FullTextBatchFetcher,
     input_file: Path,
     tmp_path: Path,
 ):
-    mocker.patch("fetch_everything_pipeline.build_fetcher", return_value=test_fetcher)
-    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
-        {"10.1000/a": "OPENALEX"}
-    )
     output = tmp_path / "out"
 
     expected_result_status = [
@@ -167,11 +173,90 @@ def test_main_writes_results_for_every_input(
         result.status for result in results
     ] == expected_result_status, "results should have the expected statuses"
 
-    assert results[0].path is not None, "results for fetched DOIs should have a path"
-    assert (
-        results[0].path.parent == output / PDF_DIR_NAME
+    assert all(
+        result.path is not None for result in results if result.status == Status.FETCHED
+    ), "results for fetched DOIs should have a path"
+    assert all(
+        result.path.parent == output / PDF_DIR_NAME
+        for result in results
+        if result.status == Status.FETCHED and result.path is not None
     ), "results for fetched DOIs should be in the expected PDF directory"
     assert (output / PDF_DIR_NAME).is_dir(), "the PDF directory should be created"
+
+
+@pytest.mark.usefixtures("cli_fetcher_with_pdf", "mock_blob_client")
+def test_main_uploads_before_writing_results(
+    mocker: MockerFixture,
+    uploaded_files: list[tuple[bytes, str]],
+    input_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("STORAGE_BLOB_ACCOUNT", "testaccount")
+    monkeypatch.setenv("STORAGE_BLOB_CONTAINER", "testcontainer")
+    output = tmp_path / "out"
+    calls = mocker.Mock()
+    calls.attach_mock(
+        mocker.spy(fetch_everything_pipeline, "upload_results"), "upload_results"
+    )
+    calls.attach_mock(
+        mocker.spy(fetch_everything_pipeline, "write_results"), "write_results"
+    )
+
+    exit_code = main(["--input", str(input_file), "--output", str(output), "--upload"])
+
+    assert exit_code == 0, "Should return 0 on success"
+    assert [name for name, _, _ in calls.mock_calls] == [
+        "upload_results",
+        "write_results",
+    ], "Expect the exact call order to be upload_results followed by write_results"
+    (pdf_bytes, pdf_blob), (manifest_bytes, manifest_blob) = uploaded_files
+    results_path = output / RESULTS_FILE_NAME
+    first_result = read_results(results_path)[0]
+    assert first_result.path is not None, "First result should have a path"
+    assert (
+        pdf_bytes == first_result.path.read_bytes()
+    ), "PDF bytes should match the first result's path content"
+    assert (
+        first_result.blob_name == pdf_blob == first_result.path.name
+    ), "Blob name and path name should match the uploaded PDF blob"
+    assert (
+        manifest_bytes == results_path.read_bytes()
+    ), "Manifest bytes should match the content of the results file"
+    assert manifest_blob.endswith(
+        f"/{RESULTS_FILE_NAME}"
+    ), "Manifest blob should end with the results file name"
+
+
+@pytest.mark.usefixtures("test_settings")
+def test_main_rejects_missing_blob_settings_before_fetching(
+    mocker: MockerFixture,
+    test_fetcher: FullTextBatchFetcher,
+    input_file: Path,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+):
+    build_fetcher_mock = mocker.patch(
+        "fetch_everything_pipeline.build_fetcher", return_value=test_fetcher
+    )
+    fetch_mock = mocker.patch("fetch_everything_pipeline.fetch_fulltexts")
+
+    exit_code = main(
+        ["--input", str(input_file), "--output", str(tmp_path / "out"), "--upload"]
+    )
+
+    assert exit_code == 1, "Should return 1 when blob settings are missing"
+    assert (
+        "'STORAGE_BLOB_ACCOUNT', 'STORAGE_BLOB_CONTAINER'" in caplog.text
+    ), "Should log missing blob settings"
+    (
+        build_fetcher_mock.assert_not_called(),
+        "build_fetcher should not be called when blob settings are missing",
+    )
+    (
+        fetch_mock.assert_not_awaited(),
+        "fetch_fulltexts should not be awaited when blob settings are missing",
+    )
 
 
 def test_main_passes_settings_to_build_fetcher(
