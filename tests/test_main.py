@@ -232,6 +232,7 @@ def test_main_uploads_before_writing_results(
     ), "Manifest blob should end with the results file name"
 
 
+<<<<<<< HEAD
 @pytest.mark.usefixtures("cli_fetcher_with_pdf")
 def test_main_writes_results_when_blob_client_cannot_be_created(
     mock_blob_client: MockType,
@@ -256,6 +257,8 @@ def test_main_writes_results_when_blob_client_cannot_be_created(
     ], "Fetched results should be saved locally as upload_failed"
 
 
+=======
+>>>>>>> 70db64f (Adds blob upload capability)
 @pytest.mark.usefixtures("test_settings")
 def test_main_rejects_missing_blob_settings_before_fetching(
     mocker: MockerFixture,
