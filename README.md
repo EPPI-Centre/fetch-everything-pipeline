@@ -71,5 +71,18 @@ Settings are read from environment variables or a `.env` file in the working dir
 | `SCOPUS_PROXY_URL`           | No                | Proxy for Scopus requests.                         |
 | `STORAGE_BLOB_ACCOUNT`       | With `--upload`   | Azure Storage account name.                        |
 | `STORAGE_BLOB_CONTAINER`     | With `--upload`   | Container to receive the PDFs.                     |
+| `KEY_VAULT_URL`              | No                | Azure Key Vault to read the settings above from.   |
+
+#### Keeping API keys in Azure Key Vault
+
+Set `KEY_VAULT_URL` (e.g. `https://<vault>.vault.azure.net/`) to read settings from Key Vault instead of putting keys in the environment. Secret names are the setting names in lower case with dashes for underscores:
+
+| Setting                      | Key Vault secret             |
+| ---------------------------- | ---------------------------- |
+| `OPENALEX_KEY`               | `openalex-key`               |
+| `ELSEVIER_SCOPUS_KEY`        | `elsevier-scopus-key`        |
+| `ELSEVIER_SCOPUS_INST_TOKEN` | `elsevier-scopus-inst-token` |
+
+Environment variables and `.env` take precedence over the vault, so a key set there overrides the vault's secret. Secrets are read with `DefaultAzureCredential`: `az login` locally, or the compute's managed identity in Azure ML, which needs the **Key Vault Secrets User** role on the vault. If the vault can't be reached or read, the command exits with 1 before fetching anything.
 
 Uploads use `DefaultAzureCredential` (no storage account key is needed): sign in with `az login` locally or assign the Azure ML compute a managed identity with the **Storage Blob Data Contributor** role. `PipelineSettings` reads `FETCH_PIPELINE_RUN_ID` first, then `AZUREML_RUN_ID` if available; if neither is set, a random ID is used. Set `FETCH_PIPELINE_RUN_ID` to the Azure ML job name in the job environment to make manifests easy to identify. The providers in use are logged at the start of each run.

@@ -20,7 +20,7 @@ from fetch_everything_pipeline import (
 )
 from fetch_everything_pipeline.fetch import DEFAULT_CHUNK_SIZE
 from fetch_everything_pipeline.models import PipelineResult, Status, read_results
-from fetch_everything_pipeline.settings import PipelineSettings
+from fetch_everything_pipeline.settings import PipelineSettings, SettingsLoadError
 from tests.fakes import mock_fetch
 
 
@@ -480,6 +480,33 @@ def test_main_fails_on_invalid_settings(
     (
         build_fetcher_mock.assert_not_called(),
         "build_fetcher() should not be called when the settings are invalid",
+    )
+
+
+def test_main_fails_when_key_vault_cannot_be_read(
+    mocker: MockerFixture,
+    test_fetcher: FullTextBatchFetcher,
+    input_file: Path,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+):
+    build_fetcher_mock = mocker.patch(
+        "fetch_everything_pipeline.build_fetcher", return_value=test_fetcher
+    )
+    mocker.patch(
+        "fetch_everything_pipeline.load_settings",
+        side_effect=SettingsLoadError("Cannot read settings from Azure Key Vault"),
+    )
+    output = tmp_path / "out"
+
+    exit_code = main(["--input", str(input_file), "--output", str(output)])
+
+    assert exit_code == 1, "main() should return 1 when Key Vault can't be read"
+    assert "Cannot read settings from Azure Key Vault" in caplog.text
+    assert not output.exists(), "main() should not create the output directory"
+    (
+        build_fetcher_mock.assert_not_called(),
+        "build_fetcher() should not be called when Key Vault can't be read",
     )
 
 
