@@ -4,7 +4,6 @@ import csv
 from pathlib import Path
 
 import pytest
-import pytest_mock
 from fer.config import ExternalAPI
 from pydantic import ValidationError
 

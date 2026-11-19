@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pytest_mock import MockerFixture
 from fer.config import ExternalAPI
 from fer.fetch_fulltext import (
     FullTextBatchFetcher,
@@ -13,6 +12,7 @@ from fer.fetch_fulltext import (
 )
 from fer.fetching.core import BaseAuthError, DOIStudyCollection
 from pydantic import SecretStr, ValidationError
+from pytest_mock import MockerFixture
 
 from fetch_everything_pipeline.fetch import (
     FER_FETCH_ERRORS,

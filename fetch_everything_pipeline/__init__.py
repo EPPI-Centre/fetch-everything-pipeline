@@ -24,7 +24,7 @@ from fetch_everything_pipeline.models import (
     Status,
     write_results,
 )
-from fetch_everything_pipeline.settings import PipelineSettings
+from fetch_everything_pipeline.settings import SettingsLoadError, load_settings
 from fetch_everything_pipeline.upload import (
     ResultsManifestUploadError,
     UploadConfigurationError,
@@ -48,6 +48,7 @@ class PDFPathError(Exception):
 MAIN_ERRORS: tuple[type[Exception], ...] = (
     InputFileError,
     PDFPathError,
+    SettingsLoadError,
     ValidationError,
     VersionInfoNotFoundError,
     OutputDirectoryError,
@@ -199,7 +200,7 @@ def main(input_args: Sequence[str] | None = None) -> int:
     """
     args = parse_args(input_args)
     try:
-        settings = PipelineSettings()
+        settings = load_settings()
         if args.upload:
             validate_upload_settings(settings)
         dois = read_dois(args.input)

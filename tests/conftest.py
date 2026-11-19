@@ -130,6 +130,7 @@ def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PipelineSe
     monkeypatch.delenv("STORAGE_BLOB_ACCOUNT_KEY", raising=False)
     monkeypatch.delenv("FETCH_PIPELINE_RUN_ID", raising=False)
     monkeypatch.delenv("AZUREML_RUN_ID", raising=False)
+    monkeypatch.delenv("KEY_VAULT_URL", raising=False)
     return PipelineSettings()
 
 
