@@ -18,10 +18,8 @@ COPY fetch_everything_pipeline/ ./fetch_everything_pipeline/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-RUN addgroup --system pipeline \
-    && adduser --system --ingroup pipeline --home /home/pipeline pipeline \
-    && chown pipeline:pipeline /app
-
-ENV HOME=/home/pipeline PATH="/app/.venv/bin:$PATH"
-USER pipeline
+# Runs as root for now, so the job can write to whatever output directory it's
+# given (bind mounts, Azure ML output folders).
+# to do: implement non-root user for writing output directories safely
+ENV PATH="/app/.venv/bin:$PATH"
 CMD ["fetch-pipeline", "--help"]

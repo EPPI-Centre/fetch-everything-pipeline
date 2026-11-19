@@ -56,7 +56,7 @@ docker run --rm --env-file .env \
   fetch-everything-pipeline fetch-pipeline --input /data/dois.txt --output /data/out
 ```
 
-The container runs as a non-root user, so the mounted output directory must be writable by it.
+The container runs as root so it can write to the mounted output directory. This will be updated to run as a non-root user in the very near future.
 
 ### Configuration
 
