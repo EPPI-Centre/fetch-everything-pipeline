@@ -11,12 +11,12 @@ ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 \
     UV_CONCURRENT_DOWNLOADS=4 UV_HTTP_TIMEOUT=60
 
 COPY pyproject.toml uv.lock README.md LICENSE ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project
+# No BuildKit cache mounts: ACR's remote builder (az acr build) doesn't support
+# them. --no-cache keeps uv's download cache out of the image layers.
+RUN uv sync --locked --no-install-project --no-cache
 
 COPY fetch_everything_pipeline/ ./fetch_everything_pipeline/
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked
+RUN uv sync --locked --no-cache
 
 # Runs as root for now, so the job can write to whatever output directory it's
 # given (bind mounts, Azure ML output folders).
