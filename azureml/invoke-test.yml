@@ -1,0 +1,11 @@
+# Inputs and outputs for a test call to the batch endpoint, in place of ADF:
+#   az ml batch-endpoint invoke -n fetch-everything-pipeline -f azureml/invoke-test.yml
+# Use a new output folder for every call.
+inputs:
+  dois:
+    type: uri_file
+    path: azureml://datastores/eppi_fetch_everything_datastore/paths/UI/2026-11-19_215819_UTC/test_dois.txt
+outputs:
+  results:
+    type: uri_folder
+    path: azureml://datastores/eppi_fetch_everything_datastore/paths/runs/endpoint-test-1/
