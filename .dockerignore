@@ -3,4 +3,6 @@
 !uv.lock
 !README.md
 !LICENSE
-!fetch_everything_pipeline/**/*.py
+!fetch_everything_pipeline/
+fetch_everything_pipeline/**/__pycache__
+fetch_everything_pipeline/**/*.pyc
