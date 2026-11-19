@@ -1,0 +1,35 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: eppi_fetch_everything
+display_name: Fetch full texts
+description: >-
+  Fetch full-text PDFs for a file of DOIs, one per line. Writes results.csv
+  (one row per input line) and the PDFs under pdfs/ to the output folder.
+version: "1"
+is_deterministic: false
+
+environment: azureml:eppi-fetch-everything-env@latest
+
+inputs:
+  dois:
+    type: uri_file
+    description: Text file with one DOI per line.
+  key_vault_url:
+    type: string
+    description: >-
+      Key Vault holding the provider keys (openalex-key, elsevier-scopus-key,
+      elsevier-scopus-inst-token), e.g. https://<vault>.vault.azure.net/
+  mailto:
+    type: string
+    description: Contact email sent to OpenAlex, Crossref and Unpaywall.
+
+outputs:
+  results:
+    type: uri_folder
+    description: results.csv and pdfs/. Set the output mode to upload in the pipeline.
+
+# Settings are passed as environment variables so they show up as editable
+# inputs in Designer. No --upload: Azure ML copies the output folder to storage.
+command: >-
+  env KEY_VAULT_URL=${{inputs.key_vault_url}} MAILTO=${{inputs.mailto}}
+  fetch-pipeline --input ${{inputs.dois}} --output ${{outputs.results}}
