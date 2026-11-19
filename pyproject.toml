@@ -14,7 +14,9 @@ requires-python = ">=3.13"
 dependencies = [
   "destiny-sdk>=0.17.6",
   "fetch-everything-robot",
-  "loguru>=0.7.3"
+  "httpx2>=2.16.0",
+  "loguru>=0.7.3",
+  "pydantic>=2.14.1"
 ]
 
 [project.optional-dependencies]
