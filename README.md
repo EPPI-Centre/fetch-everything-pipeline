@@ -41,7 +41,7 @@ Inputs with the same DOI share one PDF, so several rows can have the same `path`
 
 ### Container smoke test
 
-The Dockerfile uses BuildKit cache mounts, so build it with a BuildKit-enabled Docker installation. The image has no entrypoint, so give the command explicitly (running it with no command prints the help).
+The Dockerfile works with both BuildKit and the classic builder (which `az acr build` uses). The image has no entrypoint, so give the command explicitly (running it with no command prints the help).
 
 ```bash
 docker build -t fetch-everything-pipeline .
