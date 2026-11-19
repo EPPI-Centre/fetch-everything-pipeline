@@ -1,6 +1,6 @@
 """Tests for the pipeline result contract."""
 
-import json
+import csv
 from pathlib import Path
 
 import pytest
@@ -13,48 +13,110 @@ from fetch_everything_pipeline.models import (
     PipelineResult,
     ResultsProcessingError,
     Status,
+    empty_cells_to_none,
     read_results,
     write_results,
 )
 
 
+def read_rows(path: Path) -> list[list[str]]:
+    with path.open(encoding="utf-8", newline="") as f:
+        return list(csv.reader(f))
+
+
 def test_round_trip_happy_path(tmp_path: Path, results: list[PipelineResult]):
-    path = tmp_path / "results.jsonl"
+    path = tmp_path / "results.csv"
     write_results(results, path)
     assert read_results(path) == results
 
 
-def test_one_line_per_result_in_order(tmp_path: Path, results: list[PipelineResult]):
-    path = tmp_path / "results.jsonl"
+def test_header_then_one_row_per_result_in_order(
+    tmp_path: Path, results: list[PipelineResult]
+):
+    path = tmp_path / "results.csv"
     write_results(results, path)
-    lines = path.read_text(encoding="utf-8").splitlines()
-    assert [json.loads(line)["index"] for line in lines] == [0, 1, 2, 3]
+    header, *rows = read_rows(path)
+    assert header == list(PipelineResult.model_fields)
+    assert [row[0] for row in rows] == ["0", "1", "2", "3"]
 
 
 def test_serialised_shape(tmp_path: Path, results: list[PipelineResult]):
-    path = tmp_path / "results.jsonl"
+    path = tmp_path / "results.csv"
     write_results(results[:2], path)
 
-    expected_first = results[0].model_dump_json()
-    expected_first_doi = results[0].normalised_doi
+    with path.open(encoding="utf-8", newline="") as f:
+        first, second = csv.DictReader(f)
+    assert first == {
+        "index": "0",
+        "input_doi": "https://doi.org/10.1000/ABC",
+        "normalised_doi": "10.1000/abc",
+        "status": Status.FETCHED.value,
+        "source": ExternalAPI.OPENALEX.value,
+        "path": str(Path("out/pdfs/abc.pdf")),
+        "blob_name": "",
+        "error": "",
+    }
+    assert second == {
+        "index": "1",
+        "input_doi": "not a doi",
+        "normalised_doi": "",
+        "status": Status.INVALID_DOI.value,
+        "source": "",
+        "path": "",
+        "blob_name": "",
+        "error": "",
+    }
 
-    expected_second = results[1].model_dump_json()
-    expected_second_doi = results[1].normalised_doi
-    first, second = (json.loads(line) for line in path.read_text().splitlines())
-    assert first == json.loads(expected_first)
-    assert second == json.loads(expected_second)
-    assert first["status"] == Status.FETCHED.value
-    assert first["source"] == ExternalAPI.OPENALEX.value
-    assert first["normalised_doi"] == expected_first_doi
-    assert second["status"] == Status.INVALID_DOI.value
-    assert second["source"] is None
-    assert second["normalised_doi"] == expected_second_doi is None
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        "HTTPError: 503, retry later",
+        'Unexpected source "robot"',
+        "line one\nline two",
+    ],
+)
+def test_round_trip_csv_handles_special_characters(tmp_path: Path, error: str):
+    result = PipelineResult(
+        index=0,
+        input_doi="10.1000/a,b",
+        normalised_doi="10.1000/a,b",
+        status=Status.ERROR,
+        error=error,
+    )
+    path = tmp_path / "results.csv"
+    write_results([result], path)
+    assert read_results(path) == [result]
 
 
-def test_write_results_overwrites_existing_file(
-    tmp_path: Path, results: list[PipelineResult]
-):
-    path = tmp_path / "results.jsonl"
+def test_round_trip_keeps_empty_input_doi(tmp_path: Path):
+    result = PipelineResult(index=0, input_doi="", status=Status.INVALID_DOI)
+    path = tmp_path / "results.csv"
+    write_results([result], path)
+    [read_back] = read_results(path)
+    assert read_back.input_doi == ""
+    assert read_back == result
+
+
+def test_empty_cells_to_none_only_changes_empty_optional_fields():
+    row = {
+        "index": "0",
+        "input_doi": "",
+        "status": "invalid_doi",
+        "source": "",
+        "error": "test_error",
+    }
+    assert empty_cells_to_none(row) == {
+        "index": "0",
+        "input_doi": "",
+        "status": "invalid_doi",
+        "source": None,
+        "error": "test_error",
+    }
+
+
+def test_write_overwrites_existing_file(tmp_path: Path, results: list[PipelineResult]):
+    path = tmp_path / "results.csv"
     write_results(results, path)
     write_results(results[:1], path)
     assert read_results(path) == results[:1]
@@ -70,35 +132,41 @@ def test_write_results_raises_on_error(
 
 
 def test_empty_results(tmp_path: Path):
-    path = tmp_path / "results.jsonl"
+    path = tmp_path / "results.csv"
     with pytest.raises(EmptyResultSetError):
         write_results([], path)
 
 
-def test_read_results_skips_blank_lines(tmp_path: Path, results: list[PipelineResult]):
-    path = tmp_path / "results.jsonl"
-    path.write_text("\n" + results[0].model_dump_json() + "\n\n")
+def test_write_reports_unwritable_path(tmp_path: Path, results: list[PipelineResult]):
+    with pytest.raises(ResultsProcessingError, match="Failed to write results"):
+        write_results(results, tmp_path / "missing" / "results.csv")
+
+
+def test_read_skips_blank_lines(tmp_path: Path, results: list[PipelineResult]):
+    path = tmp_path / "results.csv"
+    write_results(results[:1], path)
+    header, row = path.read_text(encoding="utf-8").splitlines()
+    path.write_text(f"{header}\n\n{row}\n\n", encoding="utf-8")
     assert read_results(path) == results[:1]
 
 
-def test_read_results_rejects_invalid_line(tmp_path: Path):
-    path = tmp_path / "results.jsonl"
-    path.write_text('{"index": 0}\n')
-    with pytest.raises(ResultsProcessingError):
+def test_read_rejects_invalid_row(tmp_path: Path):
+    path = tmp_path / "results.csv"
+    path.write_text("index\n0\n", encoding="utf-8")
+    with pytest.raises(ResultsProcessingError, match="Failed to validate"):
         read_results(path)
 
 
-@pytest.mark.parametrize(
-    "error_type",
-    [OSError("test error"), UnicodeDecodeError("utf-8", b"", 0, 1, "test error")],
-)
-def test_read_results_raises_on_error(
-    mocker: pytest_mock.MockerFixture, tmp_path: Path, error_type
-):
-    path = tmp_path / "results.jsonl"
-    mocker.patch("pathlib.Path.open", side_effect=error_type)
-    with pytest.raises(ResultsProcessingError):
+def test_read_rejects_unparseable_file(tmp_path: Path):
+    path = tmp_path / "results.csv"
+    path.write_text("index\n" + "x" * (csv.field_size_limit() + 1), encoding="utf-8")
+    with pytest.raises(ResultsProcessingError, match="Failed to parse"):
         read_results(path)
+
+
+def test_read_reports_missing_file(tmp_path: Path):
+    with pytest.raises(ResultsProcessingError, match="Failed to read"):
+        read_results(tmp_path / "missing.csv")
 
 
 def test_status_values():

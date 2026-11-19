@@ -344,8 +344,8 @@ async def test_uploads_manifest_with_timestamp_and_azure_run_id(
     caplog: pytest.LogCaptureFixture,
 ):
     test_azure_job_name = "azure-job-123"
-    test_results_file_name = "test_results.jsonl"
-    test_manifest_file_content = '{"input_doi":"10.1000/a"}\n'
+    test_results_file_name = "test_results.csv"
+    test_manifest_file_content = "index,input_doi\n0,10.1000/a\n"
     manifest_path = tmp_path / test_results_file_name
     manifest_path.write_text(test_manifest_file_content, encoding="utf-8")
     monkeypatch.setenv("FETCH_PIPELINE_RUN_ID", test_azure_job_name)
@@ -374,7 +374,7 @@ async def test_manifest_uses_azureml_run_id_or_local_uuid_fallback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    test_manifest_file_name = "test_results.jsonl"
+    test_manifest_file_name = "test_results.csv"
     manifest_path = tmp_path / test_manifest_file_name
     test_manifest_file_content = "{}\n"
 
@@ -426,8 +426,8 @@ async def test_manifest_upload_error_is_reported(
     tmp_path: Path,
     error_type: type,
 ):
-    manifest_path = tmp_path / "results.jsonl"
-    manifest_path.write_text("{}\n", encoding="utf-8")
+    manifest_path = tmp_path / "results.csv"
+    manifest_path.write_text("index\n", encoding="utf-8")
     mock_blob_client.return_value.blob_upload.side_effect = error_type("test_error")
 
     with pytest.raises(ResultsManifestUploadError, match="test_error"):

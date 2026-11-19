@@ -34,15 +34,20 @@ from fetch_everything_pipeline.upload import (
 )
 
 PDF_DIR_NAME = "pdfs"
-RESULTS_FILE_NAME = "results.jsonl"
+RESULTS_FILE_NAME = "results.csv"
 
 
 class InputFileError(Exception):
     """Raised when the input file cannot be read or holds no DOIs."""
 
 
+class PDFPathError(Exception):
+    """Raised when a fetched PDF is not inside the output directory."""
+
+
 MAIN_ERRORS: tuple[type[Exception], ...] = (
     InputFileError,
+    PDFPathError,
     ValidationError,
     VersionInfoNotFoundError,
     OutputDirectoryError,
@@ -80,6 +85,38 @@ def read_dois(path: Path) -> list[str]:
         error_message = f"No DOIs found in input file {path}"
         raise InputFileError(error_message)
     return dois
+
+
+def relative_pdf_path(result: PipelineResult, output_dir: Path) -> PipelineResult:
+    """
+    Make a result's PDF path relative to the output directory.
+
+    A relative `output_dir` and an absolute PDF path compare correctly.
+
+    Args:
+        result (PipelineResult): A result whose path, if any, is inside
+            `output_dir`.
+        output_dir (Path): The output directory the path is made relative to.
+
+    Returns:
+        PipelineResult: The result with a relative path, or unchanged if it
+            has no path.
+
+    Raises:
+        PDFPathError: If the PDF is not inside `output_dir`.
+
+    """
+    if result.path is None:
+        return result
+    try:
+        relative_path = result.path.resolve().relative_to(output_dir.resolve())
+    except ValueError as path_error:
+        error_message = (
+            f"PDF {result.path} for {result.input_doi} is not inside the output "
+            f"directory {output_dir}"
+        )
+        raise PDFPathError(error_message) from path_error
+    return result.model_copy(update={"path": relative_path})
 
 
 def log_summary(results: list[PipelineResult]) -> None:
@@ -177,6 +214,7 @@ def main(input_args: Sequence[str] | None = None) -> int:
         )
         if args.upload:
             results = asyncio.run(upload_results(results, settings))
+        results = [relative_pdf_path(result, args.output) for result in results]
         results_path = args.output / RESULTS_FILE_NAME
         write_results(results, results_path)
         if args.upload:
