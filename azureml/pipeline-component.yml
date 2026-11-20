@@ -16,6 +16,10 @@ inputs:
   mailto:
     type: string
     default: example@example.com
+  use_scopus:
+    type: boolean
+    default: false
+    description: Fetch from Scopus too. Off by default; also needs the Scopus key.
 
 outputs:
   results:
@@ -40,5 +44,6 @@ jobs:
       dois: ${{parent.inputs.dois}}
       key_vault_url: ${{parent.inputs.key_vault_url}}
       mailto: ${{parent.inputs.mailto}}
+      use_scopus: ${{parent.inputs.use_scopus}}
     outputs:
       results: ${{parent.outputs.results}}

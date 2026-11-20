@@ -22,6 +22,10 @@ inputs:
   mailto:
     type: string
     description: Contact email sent to OpenAlex, Crossref and Unpaywall.
+  use_scopus:
+    type: boolean
+    default: false
+    description: Fetch from Scopus too. Off by default; also needs the Scopus key.
 
 outputs:
   results:
@@ -32,4 +36,5 @@ outputs:
 # inputs in Designer. No --upload: Azure ML copies the output folder to storage.
 command: >-
   env KEY_VAULT_URL=${{inputs.key_vault_url}} MAILTO=${{inputs.mailto}}
+  USE_SCOPUS=${{inputs.use_scopus}}
   fetch-pipeline --input ${{inputs.dois}} --output ${{outputs.results}}

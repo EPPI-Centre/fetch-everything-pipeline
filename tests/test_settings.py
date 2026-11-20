@@ -73,6 +73,39 @@ def test_loads_run_id_from_environment(
     assert PipelineSettings().fetch_pipeline_run_id == expected_run_id
 
 
+def test_scopus_off_by_default(test_settings: PipelineSettings):
+    assert test_settings.use_scopus is False
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("true", True),
+        ("True", True),
+        ("1", True),
+        ("false", False),
+        ("False", False),
+        ("0", False),
+    ],
+)
+@pytest.mark.usefixtures("test_settings")
+def test_loads_use_scopus_from_environment(
+    monkeypatch: pytest.MonkeyPatch, value: str, *, expected: bool
+):
+    """Azure ML renders boolean inputs as `True`/`False` in the command."""
+    monkeypatch.setenv("USE_SCOPUS", value)
+
+    assert PipelineSettings().use_scopus is expected
+
+
+@pytest.mark.usefixtures("test_settings")
+def test_rejects_invalid_use_scopus(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("USE_SCOPUS", "not_a_bool")
+
+    with pytest.raises(ValidationError):
+        PipelineSettings()
+
+
 @pytest.mark.usefixtures("test_settings")
 def test_does_not_use_key_vault_without_url(mock_secret_client: MockType):
     settings = PipelineSettings()

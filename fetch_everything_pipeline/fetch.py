@@ -5,7 +5,6 @@ from uuid import UUID
 
 import httpx2
 from fer.config import ExternalAPI, external_api_priority
-from fer.config import Settings as FERSettings
 from fer.data_models.generic import FullTextNotFoundError, FullTextUnpackError
 from fer.fetch_fulltext import (
     FullTextBatchFetcher,
@@ -21,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from fetch_everything_pipeline.dois import prepare_dois
 from fetch_everything_pipeline.models import PipelineResult, Status
+from fetch_everything_pipeline.settings import PipelineSettings
 
 DEFAULT_CHUNK_SIZE = 50
 
@@ -63,20 +63,22 @@ class FetchOutcome(BaseModel):
     error: str | None = None
 
 
-def build_fetcher(settings: FERSettings) -> FullTextBatchFetcher:
+def build_fetcher(settings: PipelineSettings) -> FullTextBatchFetcher:
     """
     Build the batch fetcher.
 
     Uses the fetcher from `fer.local.run.prepare_processor`,
     keeps only the Providers and priority.
 
-    Credentials are handled by FER.
+    Credentials are handled by FER. Unless `settings.use_scopus` is set,
+    Scopus is passed to FER's `exclude_api`, so its key and inst token are
+    never used.
 
     The rest of the processor (the enhancement protocol and its
     storage client) is not used.
 
     Args:
-        settings (FERSettings): Settings holding the provider credentials.
+        settings (PipelineSettings): Settings holding the provider credentials.
 
     Returns:
         FullTextBatchFetcher: A fetcher using every provider with credentials.
@@ -85,7 +87,8 @@ def build_fetcher(settings: FERSettings) -> FullTextBatchFetcher:
         VersionInfoNotFoundError: If FER's package metadata can't be found.
 
     """
-    return prepare_processor(settings).fulltext_fetcher
+    exclude_api = None if settings.use_scopus else [ExternalAPI.SCOPUS]
+    return prepare_processor(settings, exclude_api).fulltext_fetcher
 
 
 def enabled_providers(fetcher: FullTextBatchFetcher) -> list[ExternalAPI]:
