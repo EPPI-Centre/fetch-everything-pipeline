@@ -2,12 +2,14 @@
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import BinaryIO
 
 import pytest
+from fer.blob_storage import FetchEverythingBlobStorageClient
 from fer.config import ExternalAPI
 from fer.fetch_fulltext import FullTextBatchFetcher
 from loguru import logger
-from pytest_mock import MockerFixture
+from pytest_mock import MockerFixture, MockType
 
 from fetch_everything_pipeline.fetch import build_fetcher
 from fetch_everything_pipeline.models import (
@@ -16,6 +18,30 @@ from fetch_everything_pipeline.models import (
 )
 from fetch_everything_pipeline.settings import PipelineSettings
 from tests.fakes import mock_fetch
+
+
+@pytest.fixture
+def uploaded_files() -> list[tuple[bytes, str]]:
+    """Record the bytes and blob names submitted by the upload mock."""
+    return []
+
+
+@pytest.fixture
+def mock_blob_client(
+    mocker: MockerFixture, uploaded_files: list[tuple[bytes, str]]
+) -> MockType:
+    """Patch the blob client constructor and record uploads without network I/O."""
+
+    def record_upload(data: BinaryIO, filename: str) -> str:
+        uploaded_files.append((data.read(), filename))
+        return filename
+
+    client_factory = mocker.patch(
+        "fetch_everything_pipeline.upload.FetchEverythingBlobStorageClient",
+        autospec=FetchEverythingBlobStorageClient,
+    )
+    client_factory.return_value.blob_upload.side_effect = record_upload
+    return client_factory
 
 
 @pytest.fixture
@@ -66,6 +92,17 @@ def test_fetcher(
     mock.all_api_configs = build_fetcher(test_settings).all_api_configs
     mock.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch({})
     return mock
+
+
+@pytest.fixture
+def cli_fetcher_with_pdf(
+    mocker: MockerFixture, test_fetcher: FullTextBatchFetcher
+) -> None:
+    """Make the CLI fetch one PDF without contacting a provider."""
+    test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch(
+        {"10.1000/a": "OPENALEX"}
+    )
+    mocker.patch("fetch_everything_pipeline.build_fetcher", return_value=test_fetcher)
 
 
 @pytest.fixture

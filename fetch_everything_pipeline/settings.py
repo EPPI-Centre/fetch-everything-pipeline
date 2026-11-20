@@ -1,7 +1,7 @@
 """Define settings for the fetch everything pipeline."""
 
 from fer.config import Settings as FERSettings
-from pydantic import Field, HttpUrl, SecretStr
+from pydantic import AliasChoices, Field, HttpUrl, SecretStr
 
 
 class PipelineSettings(FERSettings):
@@ -18,6 +18,7 @@ class PipelineSettings(FERSettings):
         STORAGE_BLOB_ACCOUNT: Storage account name, needed only for upload.
         STORAGE_BLOB_CONTAINER: Container name, needed only for upload.
         STORAGE_BLOB_ACCOUNT_KEY: Unused; upload uses `DefaultAzureCredential`.
+        fetch_pipeline_run_id: Optional run ID used to identify manifest uploads.
 
     """
 
@@ -30,4 +31,9 @@ class PipelineSettings(FERSettings):
     )
     STORAGE_BLOB_ACCOUNT_KEY: SecretStr | None = Field(
         default=None, description="The account key for the Azure Storage Blob"
+    )
+    fetch_pipeline_run_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FETCH_PIPELINE_RUN_ID", "AZUREML_RUN_ID"),
+        description="Run identifier used to name the uploaded results manifest.",
     )
