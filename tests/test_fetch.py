@@ -278,7 +278,7 @@ async def test_rejects_invalid_chunk_size(
             id="empty-openalex-key-counts-as-missing",
         ),
         pytest.param(
-            {"elsevier_scopus_key": SecretStr("scopus-test-key")},
+            {"elsevier_scopus_key": SecretStr("scopus-test-key"), "use_scopus": True},
             [
                 ExternalAPI.OPENALEX,
                 ExternalAPI.CROSSREF,
@@ -286,6 +286,19 @@ async def test_rejects_invalid_chunk_size(
                 ExternalAPI.SCOPUS,
             ],
             id="all-providers-in-priority-order",
+        ),
+        pytest.param(
+            {
+                "elsevier_scopus_key": SecretStr("scopus-test-key"),
+                "elsevier_scopus_inst_token": SecretStr("scopus-test-token"),
+            },
+            [ExternalAPI.OPENALEX, ExternalAPI.CROSSREF, ExternalAPI.UNPAYWALL],
+            id="scopus-off-by-default-despite-credentials",
+        ),
+        pytest.param(
+            {"use_scopus": True},
+            [ExternalAPI.OPENALEX, ExternalAPI.CROSSREF, ExternalAPI.UNPAYWALL],
+            id="use-scopus-still-needs-key",
         ),
     ],
 )

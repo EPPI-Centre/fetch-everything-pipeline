@@ -36,6 +36,8 @@ class PipelineSettings(FERSettings):
         STORAGE_BLOB_ACCOUNT_KEY: Unused; upload uses `DefaultAzureCredential`.
         fetch_pipeline_run_id: Optional run ID used to identify manifest uploads.
         key_vault_url: Optional Azure Key Vault to read settings from.
+        use_scopus: Include Scopus in the providers. Off by default, so its key
+            and inst token aren't used unless this is set, even when they are.
 
     """
 
@@ -57,6 +59,10 @@ class PipelineSettings(FERSettings):
     key_vault_url: HttpUrl | None = Field(
         default=None,
         description="Azure Key Vault to read settings from, e.g. provider keys.",
+    )
+    use_scopus: bool = Field(
+        default=False,
+        description="Fetch from Scopus. Also needs the Scopus key.",
     )
 
     @classmethod
