@@ -144,7 +144,7 @@ async def upload_results_manifest(
     Upload the results manifest under a unique blob name.
 
     Args:
-        path (Path): Local path to the completed results JSONL file.
+        path (Path): Local path to the completed results CSV file.
         settings (PipelineSettings): Settings containing blob storage details.
 
     Returns:

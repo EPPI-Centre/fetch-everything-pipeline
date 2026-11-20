@@ -127,6 +127,7 @@ def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PipelineSe
     monkeypatch.delenv("STORAGE_BLOB_ACCOUNT", raising=False)
     monkeypatch.delenv("STORAGE_BLOB_CONTAINER", raising=False)
     monkeypatch.delenv("STORAGE_BLOB_ACCOUNT_KEY", raising=False)
+    monkeypatch.delenv("KEY_VAULT_URL", raising=False)
     return PipelineSettings()
 
 
