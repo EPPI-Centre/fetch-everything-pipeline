@@ -8,4 +8,4 @@ inputs:
 outputs:
   results:
     type: uri_folder
-    path: azureml://datastores/eppi_fetch_everything_datastore/paths/runs/endpoint-test-1/
+    path: azureml://datastores/eppi_fetch_everything_datastore/paths/runs/endpoint-test-v2-1/
