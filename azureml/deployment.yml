@@ -1,6 +1,5 @@
 $schema: https://azuremlschemas.azureedge.net/latest/pipelineComponentBatchDeployment.schema.json
-# One deployment per released version of the pipeline component. Create a new
-# one for each release, test it by name, then make it the endpoint's default.
+# One deployment per released version of the pipeline component
 name: fetch-everything-v2
 endpoint_name: fetch-everything-pipeline
 description: Runs version 2 of the eppi_fetch_everything_pipeline pipeline component.
@@ -8,5 +7,4 @@ type: pipeline
 component: azureml:eppi_fetch_everything_pipeline:2
 settings:
   default_compute: azureml:eppi-fetch-everything-cpu
-  # Used only when a call doesn't give an output path; calls (ADF) always should.
   default_datastore: azureml:eppi_fetch_everything_datastore

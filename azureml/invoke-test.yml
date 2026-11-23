@@ -1,6 +1,7 @@
-# Inputs and outputs for a test call to the batch endpoint, in place of ADF:
+# To be used locally to invoke tests of the fetch-everything-pipeline batch endpoint
+# This file specifies the inputs and outputs for a test call to the batch endpoint.
+# Run this with:
 #   az ml batch-endpoint invoke -n fetch-everything-pipeline -f azureml/invoke-test.yml
-# Use a new output folder for every call.
 inputs:
   dois:
     type: uri_file

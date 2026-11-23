@@ -25,15 +25,15 @@ inputs:
   use_scopus:
     type: boolean
     default: false
-    description: Fetch from Scopus too. Off by default; also needs the Scopus key.
+    description: Fetch from Scopus too. Off by default and also needs the Scopus key.
 
 outputs:
   results:
     type: uri_folder
     description: results.csv and pdfs/. Set the output mode to upload in the pipeline.
 
-# Settings are passed as environment variables so they show up as editable
-# inputs in Designer. No --upload: Azure ML copies the output folder to storage.
+# Settings are passed as environment variables so they
+# show up as editable inputs in Azure ML.
 command: >-
   env KEY_VAULT_URL=${{inputs.key_vault_url}} MAILTO=${{inputs.mailto}}
   USE_SCOPUS=${{inputs.use_scopus}}
