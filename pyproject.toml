@@ -89,7 +89,7 @@ exclude-dependencies = [
 exclude-newer = "P5D"
 
 [tool.uv.build-backend]
-module-root = "fetch-everything"
+module-root = ""
 
 [tool.uv.sources]
 fetch-everything-robot = {git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b9159e4120ca66f04818a36434e319d216b28b62"} # pragma: allowlist secret
