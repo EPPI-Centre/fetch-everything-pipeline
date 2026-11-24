@@ -399,7 +399,7 @@ def test_prepare_output_dir_errors_caught(
         prepare_output_dir(output_dir)
 
 
-def test_prepare_output_dir_directory_not_empty(
+def test_prepare_output_dir_directory_initially_not_empty(
     tmp_path: Path,
 ):
     output_dir = tmp_path / "pdfs"
@@ -410,3 +410,17 @@ def test_prepare_output_dir_directory_not_empty(
         prepare_output_dir(output_dir)
 
     assert f"Output directory {output_dir} is not empty" in str(not_empty_error.value)
+
+
+def test_prepare_output_dir_double_call_raises(
+    tmp_path: Path,
+):
+    output_dir = tmp_path / "pdfs"
+    prepare_output_dir(output_dir)
+
+    with pytest.raises(OutputDirectoryError) as double_call_error:
+        prepare_output_dir(output_dir)
+
+    assert f"Output directory {output_dir} is already in use by another run" in str(
+        double_call_error.value
+    )
