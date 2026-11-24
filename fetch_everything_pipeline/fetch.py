@@ -23,6 +23,7 @@ from fetch_everything_pipeline.dois import prepare_dois
 from fetch_everything_pipeline.models import PipelineResult, Status
 
 DEFAULT_CHUNK_SIZE = 50
+DIRECTORY_RESERVATION_FILENAME = ".fetch-pipeline-reservation"
 
 FER_FETCH_ERRORS: tuple[type[Exception], ...] = (
     httpx2.HTTPError,
@@ -136,7 +137,8 @@ async def fetch_fulltexts(
 
     Raises:
         ValueError: If `chunk_size` is less than 1.
-        OutputDirectoryError: If `output_dir` can't be created or isn't empty.
+        OutputDirectoryError: If `output_dir` can't be reserved, created, or is not
+            empty.
 
     """
     if chunk_size < 1:
@@ -183,11 +185,17 @@ def prepare_output_dir(output_dir: Path) -> None:
     """
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
-        is_empty = not any(output_dir.iterdir())
+        (output_dir / DIRECTORY_RESERVATION_FILENAME).touch(exist_ok=False)
+        contents = [path.name for path in output_dir.iterdir()]
+    except FileExistsError as reservation_error:
+        error_message = (
+            f"Output directory {output_dir} is already in use by another run"
+        )
+        raise OutputDirectoryError(error_message) from reservation_error
     except OSError as output_dir_error:
         error_message = f"Cannot use output directory {output_dir}: {output_dir_error}"
         raise OutputDirectoryError(error_message) from output_dir_error
-    if not is_empty:
+    if contents != [DIRECTORY_RESERVATION_FILENAME]:
         error_message = f"Output directory {output_dir} is not empty"
         raise OutputDirectoryError(error_message)
 

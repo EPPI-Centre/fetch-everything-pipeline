@@ -12,11 +12,13 @@ from pydantic import SecretStr, ValidationError
 from pytest_mock import MockerFixture
 
 from fetch_everything_pipeline.fetch import (
+    DIRECTORY_RESERVATION_FILENAME,
     FER_FETCH_ERRORS,
     OutputDirectoryError,
     build_fetcher,
     enabled_providers,
     fetch_fulltexts,
+    prepare_output_dir,
 )
 from fetch_everything_pipeline.models import Status
 from fetch_everything_pipeline.settings import PipelineSettings
@@ -92,7 +94,7 @@ def chunks_passed(test_fetcher: FullTextBatchFetcher) -> list[list[str]]:
     ]
 
 
-async def test_one_result_per_input_in_input_order(
+async def test_fetch_fulltexts_one_result_per_input_in_input_order(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
@@ -127,7 +129,7 @@ async def test_one_result_per_input_in_input_order(
 
 
 @pytest.mark.parametrize("source", list(ExternalAPI))
-async def test_source_passed_through_from_fer(
+async def test_fetch_fulltexts_source_passed_through_from_fer(
     test_fetcher: FullTextBatchFetcher, output_dir: Path, source: ExternalAPI
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
@@ -142,7 +144,7 @@ async def test_source_passed_through_from_fer(
     assert result.path.parent == output_dir
 
 
-async def test_duplicates_fetched_once_and_share_result(
+async def test_fetch_fulltexts_duplicates_fetched_once_and_share_result(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
@@ -163,7 +165,7 @@ async def test_duplicates_fetched_once_and_share_result(
     "error_type",
     [error for error in FER_FETCH_ERRORS if error is not ValidationError],
 )
-async def test_failing_chunk_does_not_affect_other_chunks(
+async def test_fetch_fulltexts_failing_chunk_does_not_affect_other_chunks(
     test_fetcher: FullTextBatchFetcher, output_dir: Path, error_type: type[Exception]
 ):
     """
@@ -185,7 +187,7 @@ async def test_failing_chunk_does_not_affect_other_chunks(
     assert results[1].error == f"{error_type.__name__}: Error on 10.1000/b"
 
 
-async def test_unexpected_exception_propagates(
+async def test_fetch_fulltexts_unexpected_exception_propagates(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
@@ -196,7 +198,7 @@ async def test_unexpected_exception_propagates(
         await fetch_fulltexts(["10.1000/a"], output_dir, test_fetcher)
 
 
-async def test_failing_chunk_marks_every_input_in_it(
+async def test_fetch_fulltexts_failing_chunk_marks_every_input_in_it(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch(
@@ -210,7 +212,9 @@ async def test_failing_chunk_marks_every_input_in_it(
     assert [r.status for r in results] == [Status.ERROR] * 3
 
 
-async def test_chunks_unique_dois(test_fetcher: FullTextBatchFetcher, output_dir: Path):
+async def test_fetch_fulltexts_chunks_unique_dois(
+    test_fetcher: FullTextBatchFetcher, output_dir: Path
+):
     dois = [
         "10.1000/0",
         "not a doi",
@@ -233,7 +237,7 @@ async def test_chunks_unique_dois(test_fetcher: FullTextBatchFetcher, output_dir
     ]
 
 
-async def test_unexpected_source_is_error(
+async def test_fetch_fulltexts_unexpected_source_is_error(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     """FER reports `robot_title` for files already on disk; that isn't a provider."""
@@ -248,7 +252,7 @@ async def test_unexpected_source_is_error(
     assert result.error == "Unexpected source 'Fetch Everything Robot (FER)'"
 
 
-async def test_missing_fer_result_is_error(
+async def test_fetch_fulltexts_missing_fer_result_is_error(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.side_effect = None
@@ -260,7 +264,7 @@ async def test_missing_fer_result_is_error(
     assert result.error == "FER returned no result"
 
 
-async def test_all_invalid_skips_fetcher(
+async def test_fetch_fulltexts_all_invalid_skips_fetcher(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     results = await fetch_fulltexts(["bad", ""], output_dir, test_fetcher)
@@ -269,12 +273,14 @@ async def test_all_invalid_skips_fetcher(
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.assert_not_called()
 
 
-async def test_empty_input(test_fetcher: FullTextBatchFetcher, output_dir: Path):
+async def test_fetch_fulltexts_empty_input(
+    test_fetcher: FullTextBatchFetcher, output_dir: Path
+):
     assert await fetch_fulltexts([], output_dir, test_fetcher) == []
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.assert_not_called()
 
 
-async def test_creates_missing_output_dir(
+async def test_fetch_fulltexts_creates_missing_output_dir(
     test_fetcher: FullTextBatchFetcher, tmp_path: Path
 ):
     output_dir = tmp_path / "new" / "pdfs"
@@ -284,7 +290,7 @@ async def test_creates_missing_output_dir(
     assert output_dir.is_dir()
 
 
-async def test_rejects_non_empty_output_dir(
+async def test_fetch_fulltexts_rejects_non_empty_output_dir(
     test_fetcher: FullTextBatchFetcher, output_dir: Path
 ):
     output_dir.mkdir()
@@ -295,7 +301,7 @@ async def test_rejects_non_empty_output_dir(
     test_fetcher.get_many_fulltext_pdfs_cycling_apis.assert_not_called()
 
 
-async def test_rejects_output_path_that_is_a_file(
+async def test_fetch_fulltexts_rejects_output_path_that_is_a_file(
     test_fetcher: FullTextBatchFetcher, tmp_path: Path
 ):
     output_dir = tmp_path / "pdfs"
@@ -306,7 +312,7 @@ async def test_rejects_output_path_that_is_a_file(
 
 
 @pytest.mark.parametrize("chunk_size", [0, -1])
-async def test_rejects_invalid_chunk_size(
+async def test_fetch_fulltexts_rejects_invalid_chunk_size(
     test_fetcher: FullTextBatchFetcher, output_dir: Path, chunk_size: int
 ):
     with pytest.raises(ValueError, match="chunk_size"):
@@ -365,3 +371,42 @@ def test_build_fetcher_passes_credentials(test_settings: PipelineSettings):
     )
     assert openalex.query_params is not None
     assert openalex.query_params["mailto"] == "pipeline@example.org"
+
+
+def test_prepare_output_dir_success(tmp_path: Path):
+    output_dir = tmp_path / "pdfs"
+    prepare_output_dir(output_dir)
+    assert output_dir.exists()
+    assert (output_dir / DIRECTORY_RESERVATION_FILENAME).exists()
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [
+        FileExistsError("file exists"),
+        OSError("os error"),
+    ],
+)
+def test_prepare_output_dir_errors_caught(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    error_type: Exception,
+):
+    output_dir = tmp_path / "pdfs"
+    mocker.patch("pathlib.Path.mkdir", side_effect=error_type)
+
+    with pytest.raises(OutputDirectoryError):
+        prepare_output_dir(output_dir)
+
+
+def test_prepare_output_dir_directory_not_empty(
+    tmp_path: Path,
+):
+    output_dir = tmp_path / "pdfs"
+    output_dir.mkdir()
+    (output_dir / "dummy.pdf").write_text("dummy")
+
+    with pytest.raises(OutputDirectoryError) as not_empty_error:
+        prepare_output_dir(output_dir)
+
+    assert f"Output directory {output_dir} is not empty" in str(not_empty_error.value)
