@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import pytest_mock
 from fer.config import ExternalAPI
 from pydantic import ValidationError
 
@@ -50,11 +51,22 @@ def test_serialised_shape(tmp_path: Path, results: list[PipelineResult]):
     assert second["normalised_doi"] == expected_second_doi is None
 
 
-def test_write_overwrites_existing_file(tmp_path: Path, results: list[PipelineResult]):
+def test_write_results_overwrites_existing_file(
+    tmp_path: Path, results: list[PipelineResult]
+):
     path = tmp_path / "results.jsonl"
     write_results(results, path)
     write_results(results[:1], path)
     assert read_results(path) == results[:1]
+
+
+def test_write_results_raises_on_error(
+    mocker, tmp_path: Path, results: list[PipelineResult]
+):
+    path = tmp_path / "results.jsonl"
+    mocker.patch("pathlib.Path.open", side_effect=OSError("test error"))
+    with pytest.raises(ResultsProcessingError):
+        write_results(results, path)
 
 
 def test_empty_results(tmp_path: Path):
@@ -63,15 +75,28 @@ def test_empty_results(tmp_path: Path):
         write_results([], path)
 
 
-def test_read_skips_blank_lines(tmp_path: Path, results: list[PipelineResult]):
+def test_read_results_skips_blank_lines(tmp_path: Path, results: list[PipelineResult]):
     path = tmp_path / "results.jsonl"
     path.write_text("\n" + results[0].model_dump_json() + "\n\n")
     assert read_results(path) == results[:1]
 
 
-def test_read_rejects_invalid_line(tmp_path: Path):
+def test_read_results_rejects_invalid_line(tmp_path: Path):
     path = tmp_path / "results.jsonl"
     path.write_text('{"index": 0}\n')
+    with pytest.raises(ResultsProcessingError):
+        read_results(path)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [OSError("test error"), UnicodeDecodeError("utf-8", b"", 0, 1, "test error")],
+)
+def test_read_results_raises_on_error(
+    mocker: pytest_mock.MockerFixture, tmp_path: Path, error_type
+):
+    path = tmp_path / "results.jsonl"
+    mocker.patch("pathlib.Path.open", side_effect=error_type)
     with pytest.raises(ResultsProcessingError):
         read_results(path)
 

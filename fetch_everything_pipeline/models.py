@@ -101,7 +101,7 @@ def read_results(path: Path) -> list[PipelineResult]:
             return [
                 PipelineResult.model_validate_json(line) for line in f if line.strip()
             ]
-    except OSError as result_read_error:
+    except (OSError, UnicodeDecodeError) as result_read_error:
         error_message = f"Failed to read results from {path}: {result_read_error}"
         raise ResultsProcessingError(error_message) from result_read_error
     except ValidationError as result_validation_error:
