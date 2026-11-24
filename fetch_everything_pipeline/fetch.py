@@ -10,7 +10,9 @@ from fer.data_models.generic import FullTextNotFoundError, FullTextUnpackError
 from fer.fetch_fulltext import (
     FullTextBatchFetcher,
     FullTextBatchFetcherError,
+    FullTextFetcherError,
     FullTextResult,
+    RetrievedFullText,
 )
 from fer.fetching.core import DOIStudyCollection, FullTextStreamError
 from fer.fetching.openalex import OpenAlexAPIError, PDFUnavailableError
@@ -222,6 +224,24 @@ async def fetch_chunk(
         dict[UUID, FetchOutcome]: An outcome for every study in the chunk.
 
     """
+    failed_providers: set[str] = set()
+    provider_fetch = fetcher.full_text_fetcher.fetch
+
+    async def recording_fetch(**kwargs: object) -> list[RetrievedFullText]:
+        """
+        Record any failed providers during the fetch.
+
+        Returns:
+            list[RetrievedFullText]: The list of successfully retrieved full texts.
+
+        """
+        try:
+            return await provider_fetch(**kwargs)
+        except FullTextFetcherError:
+            failed_providers.add(str(kwargs.get("publisher_name")))
+            raise
+
+    fetcher.full_text_fetcher.fetch = recording_fetch
     try:
         fer_results = await fetcher.get_many_fulltext_pdfs_cycling_apis(
             input_study_collection=chunk,
@@ -233,6 +253,20 @@ async def fetch_chunk(
             status=Status.ERROR, error=f"{type(chunk_error).__name__}: {chunk_error}"
         )
         return {study.uid: outcome for study in chunk.studies}
+    finally:
+        fetcher.full_text_fetcher.fetch = provider_fetch
+
+    if failed_providers.issuperset(fetcher.all_api_configs["fulltext"]):
+        error_message = "All fulltext providers failed"
+        logger.error(error_message)
+        outcome = FetchOutcome(status=Status.ERROR, error_message=error_message)
+        return {study.uid: outcome for study in chunk.studies}
+
+    if failed_providers:
+        warning_message = (
+            f"Some fulltext providers failed: {', '.join(failed_providers)}"
+        )
+        logger.warning(warning_message)
 
     by_uid = {UUID(result.uid): result for result in fer_results}
     return {study.uid: to_outcome(by_uid.get(study.uid)) for study in chunk.studies}

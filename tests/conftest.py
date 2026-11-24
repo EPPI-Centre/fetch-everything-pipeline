@@ -1,15 +1,34 @@
 """Define test configuration and fixtures."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from fer.config import ExternalAPI
+from loguru import logger
 
 from fetch_everything_pipeline.models import (
     PipelineResult,
     Status,
 )
 from fetch_everything_pipeline.settings import PipelineSettings
+
+
+@pytest.fixture
+def caplog(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
+    """
+    Route loguru logs to pytest caplog.
+
+    Args:
+        caplog (pytest.LogCaptureFixture): The pytest log capture fixture.
+
+    Returns:
+        Iterator[pytest.LogCaptureFixture]: Yields the caplog fixture for use in tests.
+
+    """
+    handler_id = logger.add(caplog.handler, format="{message}")
+    yield caplog
+    logger.remove(handler_id)
 
 
 @pytest.fixture

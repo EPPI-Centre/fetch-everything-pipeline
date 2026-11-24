@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 from fer.config import ExternalAPI
-from fer.fetch_fulltext import FullTextBatchFetcher, FullTextResult
-from fer.fetching.core import DOIStudyCollection
+from fer.fetch_fulltext import FullTextBatchFetcher, FullTextFetcher, FullTextResult
+from fer.fetching.core import BaseAuthError, DOIStudyCollection
 from pydantic import SecretStr, ValidationError
 from pytest_mock import MockerFixture
 
@@ -75,6 +75,8 @@ def fake_fetch(
 def test_fetcher(mocker: MockerFixture) -> FullTextBatchFetcher:
     mock = mocker.create_autospec(FullTextBatchFetcher, instance=True)
     mock.get_many_fulltext_pdfs_cycling_apis.side_effect = fake_fetch({})
+    mock.full_text_fetcher = mocker.create_autospec(FullTextFetcher, instance=True)
+    mock.all_api_configs = {"fulltext": {api.name: {} for api in ExternalAPI}}
     return mock
 
 
@@ -319,6 +321,41 @@ async def test_fetch_fulltexts_rejects_invalid_chunk_size(
         await fetch_fulltexts(
             ["10.1000/a"], output_dir, test_fetcher, chunk_size=chunk_size
         )
+
+
+@pytest.mark.parametrize(
+    ("failing", "expected"),
+    [
+        ({api.name for api in ExternalAPI}, Status.ERROR),
+        ({ExternalAPI.OPENALEX.name}, Status.NOT_FOUND),
+        (set(), Status.NOT_FOUND),
+    ],
+    ids=["all-fail", "some-fail", "none-fail"],
+)
+async def test_fetch_chunk_handles_failed_providers(
+    mocker: MockerFixture,
+    test_settings: PipelineSettings,
+    output_dir: Path,
+    failing: set[str],
+    expected: Status,
+    caplog: pytest.LogCaptureFixture,
+):
+    test_dois = ["10.1000/abc"]
+    fetcher = build_fetcher(test_settings)
+
+    for api_name in fetcher.all_api_configs["fulltext"]:
+        mocker.patch.object(
+            fetcher.full_text_fetcher.fetchers[api_name.lower()],
+            "fetch_many_full_texts",
+            side_effect=BaseAuthError if api_name in failing else None,
+            return_value=[],
+        )
+    with caplog.at_level("WARNING"):
+        [result] = await fetch_fulltexts(test_dois, output_dir, fetcher)
+
+    assert result.status == expected
+    if failing and expected != Status.ERROR:
+        assert "Some fulltext providers failed" in caplog.text
 
 
 @pytest.mark.parametrize(
