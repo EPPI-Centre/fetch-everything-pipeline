@@ -18,9 +18,9 @@ uv run fetch-pipeline --input dois.txt --output out/ --upload
 - `--input`: a text file with one DOI per line. URL and `doi:` prefixes are accepted; blank lines are skipped.
 - `--output`: a new or empty directory. PDFs are written to `out/pdfs/` and one result per input line to `out/results.jsonl`.
 - `--chunk-size` (optional, default 50): number of unique DOIs passed to the fetcher at once.
-- `--upload` (optional, for development and testing): uploads each fetched PDF to the configured container as `<PDF filename stem>-<random hex>.pdf`, so uploads never overwrite each other and each result's `blob_name` points to the file that run fetched. It also uploads `results.jsonl` to `results/<UTC timestamp>-<run-id>-<random hex>/results.jsonl` so each run's DOI-to-blob mapping is retained, even when runs share a run ID. PDF upload failures are recorded as `upload_failed`, other DOIs continue.
+- `--upload` (optional, for development and testing): uploads each fetched PDF to the configured container as `<PDF filename stem>-<random hex>.pdf`, so uploads never overwrite each other and each result's `blob_name` points to the file that run fetched. It also uploads `results.jsonl` to `results/<UTC timestamp>-<run-id>-<random hex>/results.jsonl` so each run's DOI-to-blob mapping is retained, even when runs share a run ID. PDF upload failures are recorded as `upload_failed`, other DOIs continue. If the results manifest can't be uploaded, the command exits with 1. Local results are written first, so they're retained in the output directory.
 
-Each result has a `status` of `fetched`, `not_found`, `invalid_doi`, `error` or `upload_failed`, and `fetched` results include the `source` API. Per-DOI failures are recorded in the results; the command exits with 1 only when the input file, settings or output directory can't be used.
+Each result has a `status` of `fetched`, `not_found`, `invalid_doi`, `error` or `upload_failed`, and `fetched` results include the `source` API. Per-DOI failures are recorded in the results. The command exits with 1 when the input file, settings or output directory can't be used.
 
 ### Configuration
 
