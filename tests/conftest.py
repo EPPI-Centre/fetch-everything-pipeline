@@ -5,25 +5,57 @@ from pathlib import Path
 
 import pytest
 from fer.config import ExternalAPI
+from fer.fetch_fulltext import FullTextBatchFetcher, FullTextFetcher
 from loguru import logger
+from pytest_mock import MockerFixture
 
+from fetch_everything_pipeline.fetch import build_fetcher
 from fetch_everything_pipeline.models import (
     PipelineResult,
     Status,
 )
 from fetch_everything_pipeline.settings import PipelineSettings
+from tests.fakes import mock_fetch
+
+
+@pytest.fixture
+def test_fetcher(
+    mocker: MockerFixture, test_settings: PipelineSettings
+) -> FullTextBatchFetcher:
+    """
+    Mock a `FullTextBatchFetcher` that finds nothing by default.
+
+    Args:
+        mocker (MockerFixture): The pytest-mock fixture.
+        test_settings (PipelineSettings): Settings the real fetcher is built
+            from.
+
+    Returns:
+        FullTextBatchFetcher: The mock with the side effect of
+            `get_many_fulltext_pdfs_cycling_apis` set to `mock_fetch` to change
+            what it finds.
+
+    """
+    mock = mocker.create_autospec(FullTextBatchFetcher, instance=True)
+    mock.full_text_fetcher = mocker.create_autospec(FullTextFetcher, instance=True)
+    mock.all_api_configs = build_fetcher(test_settings).all_api_configs
+    mock.get_many_fulltext_pdfs_cycling_apis.side_effect = mock_fetch({})
+    return mock
 
 
 @pytest.fixture
 def caplog(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
     """
-    Route loguru logs to pytest caplog.
+    Make pytest's `caplog` capture loguru messages.
+
+    Loguru doesn't use the standard `logging` module, so this adds a sink that
+    writes to `caplog.handler` for the duration of the test.
 
     Args:
-        caplog (pytest.LogCaptureFixture): The pytest log capture fixture.
+        caplog (pytest.LogCaptureFixture): pytest's built-in fixture.
 
-    Returns:
-        Iterator[pytest.LogCaptureFixture]: Yields the caplog fixture for use in tests.
+    Yields:
+        pytest.LogCaptureFixture: The same fixture, now receiving loguru output.
 
     """
     handler_id = logger.add(caplog.handler, format="{message}")
