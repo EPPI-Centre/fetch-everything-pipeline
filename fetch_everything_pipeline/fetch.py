@@ -1,23 +1,20 @@
 """Fetch full texts for input DOIs using FER's batch fetcher."""
 
+import copy
 from pathlib import Path
 from uuid import UUID
 
 import httpx2
 from fer.config import ExternalAPI, external_api_priority
 from fer.config import Settings as FERSettings
-from fer.data_models.generic import FullTextNotFoundError, FullTextUnpackError
 from fer.fetch_fulltext import (
     FullTextBatchFetcher,
-    FullTextBatchFetcherError,
     FullTextFetcherError,
     FullTextResult,
     RetrievedFullText,
 )
-from fer.fetching.core import DOIStudyCollection, FullTextStreamError
-from fer.fetching.openalex import OpenAlexAPIError, PDFUnavailableError
+from fer.fetching.core import DOIStudyCollection
 from fer.local.run import prepare_processor
-from fer.utils import InvalidDOIError
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -27,18 +24,13 @@ from fetch_everything_pipeline.models import PipelineResult, Status
 DEFAULT_CHUNK_SIZE = 50
 DIRECTORY_RESERVATION_FILENAME = ".fetch-pipeline-reservation"
 
+# Errors that can escape FER's `get_many_fulltext_pdfs_cycling_apis` at the
+# pinned commit.
+# To be reassessed when FER is updated.
 FER_FETCH_ERRORS: tuple[type[Exception], ...] = (
     httpx2.HTTPError,
-    httpx2.StreamError,
     OSError,
     ValidationError,
-    FullTextBatchFetcherError,
-    FullTextStreamError,
-    FullTextUnpackError,
-    FullTextNotFoundError,
-    InvalidDOIError,
-    OpenAlexAPIError,
-    PDFUnavailableError,
 )
 
 
@@ -202,18 +194,68 @@ def prepare_output_dir(output_dir: Path) -> None:
         raise OutputDirectoryError(error_message)
 
 
+def recording_fetcher(
+    fetcher: FullTextBatchFetcher, failed_providers: set[str]
+) -> FullTextBatchFetcher:
+    """
+    Make a per-call shallow copy of a fetcher that records which providers fail.
+
+    FER catches `FullTextFetcherError` for each provider and moves on, so the
+    failures are only visible inside its provider loop.
+
+    The copy's `full_text_fetcher.fetch` records them before re-raising.
+
+    Args:
+        fetcher (FullTextBatchFetcher): The shared fetcher, from `build_fetcher`.
+        failed_providers (set[str]): Set of failed provider names.
+
+    Returns:
+        FullTextBatchFetcher: A copy of `fetcher` for one call.
+
+    """
+    provider_fetch = fetcher.full_text_fetcher.fetch
+
+    async def recording_fetch(**kwargs: object) -> list[RetrievedFullText]:
+        """
+        Record any failed providers during the fetch.
+
+        Args:
+            **kwargs (object): The arguments FER passes to
+                `FullTextFetcher.fetch`.
+
+        Returns:
+            list[RetrievedFullText]: The list of successfully retrieved full texts.
+
+        Raises:
+            FullTextFetcherError: If the provider fails, after recording it.
+
+        """
+        try:
+            return await provider_fetch(**kwargs)
+        except FullTextFetcherError:
+            failed_providers.add(str(kwargs.get("publisher_name")))
+            raise
+
+    run_fetcher = copy.copy(fetcher)
+    run_fetcher.full_text_fetcher = copy.copy(fetcher.full_text_fetcher)
+    run_fetcher.full_text_fetcher.fetch = recording_fetch
+    return run_fetcher
+
+
 async def fetch_chunk(
     fetcher: FullTextBatchFetcher,
     chunk: DOIStudyCollection,
     output_dir: Path,
 ) -> dict[UUID, FetchOutcome]:
     """
-    Fetch one chunk of unique studies and map FER's results back by UID.
+    Fetch a single chunk of unique Studies and map FER's results back by UID.
 
     FER only catches `FullTextFetcherError` for each provider; any other
-    exception aborts its whole call. The known ones (`FER_FETCH_ERRORS`) are
-    caught here and reported as an `error` outcome for every study in the
-    chunk. Any other exception is a bug and propagates.
+    exception aborts its whole call.
+    Known errors in `FER_FETCH_ERRORS` are caught here and reported as an `error`
+    outcome for every study in the chunk.
+
+    Any other exception is a bug and propagates.
 
     Args:
         fetcher (FullTextBatchFetcher): The fetcher to call.
@@ -225,25 +267,9 @@ async def fetch_chunk(
 
     """
     failed_providers: set[str] = set()
-    provider_fetch = fetcher.full_text_fetcher.fetch
-
-    async def recording_fetch(**kwargs: object) -> list[RetrievedFullText]:
-        """
-        Record any failed providers during the fetch.
-
-        Returns:
-            list[RetrievedFullText]: The list of successfully retrieved full texts.
-
-        """
-        try:
-            return await provider_fetch(**kwargs)
-        except FullTextFetcherError:
-            failed_providers.add(str(kwargs.get("publisher_name")))
-            raise
-
-    fetcher.full_text_fetcher.fetch = recording_fetch
+    run_fetcher = recording_fetcher(fetcher, failed_providers)
     try:
-        fer_results = await fetcher.get_many_fulltext_pdfs_cycling_apis(
+        fer_results = await run_fetcher.get_many_fulltext_pdfs_cycling_apis(
             input_study_collection=chunk,
             output_directory=output_dir,
         )
@@ -253,13 +279,11 @@ async def fetch_chunk(
             status=Status.ERROR, error=f"{type(chunk_error).__name__}: {chunk_error}"
         )
         return {study.uid: outcome for study in chunk.studies}
-    finally:
-        fetcher.full_text_fetcher.fetch = provider_fetch
 
     if failed_providers.issuperset(fetcher.all_api_configs["fulltext"]):
         error_message = "All fulltext providers failed"
         logger.error(error_message)
-        outcome = FetchOutcome(status=Status.ERROR, error_message=error_message)
+        outcome = FetchOutcome(status=Status.ERROR, error=error_message)
         return {study.uid: outcome for study in chunk.studies}
 
     if failed_providers:

@@ -1,12 +1,18 @@
 """Tests for fetch orchestration."""
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fer.config import ExternalAPI
-from fer.fetch_fulltext import FullTextBatchFetcher, FullTextFetcher, FullTextResult
+from fer.fetch_fulltext import (
+    FullTextBatchFetcher,
+    FullTextFetcher,
+    FullTextResult,
+    RetrievedFullText,
+)
 from fer.fetching.core import BaseAuthError, DOIStudyCollection
 from pydantic import SecretStr, ValidationError
 from pytest_mock import MockerFixture
@@ -354,8 +360,49 @@ async def test_fetch_chunk_handles_failed_providers(
         [result] = await fetch_fulltexts(test_dois, output_dir, fetcher)
 
     assert result.status == expected
+    if expected == Status.ERROR:
+        assert result.error == "All fulltext providers failed"
     if failing and expected != Status.ERROR:
         assert "Some fulltext providers failed" in caplog.text
+
+
+async def test_concurrent_runs_on_shared_fetcher_record_own_failures(
+    mocker: MockerFixture, test_settings: PipelineSettings, tmp_path: Path
+):
+    fetcher = build_fetcher(test_settings)
+    failing_dir = tmp_path / "failing"
+    not_found_dir = tmp_path / "not_found"
+    provider_fetch = fetcher.full_text_fetcher.fetch
+
+    async def fail_in_failing_dir(
+        _study_collection: DOIStudyCollection, output_directory: Path, **_: object
+    ) -> list[RetrievedFullText]:
+        """
+        Fail in the `failing_dir` and yield control to allow interleaving.
+
+        Yields with asyncio sleep call.
+
+        """
+        await asyncio.sleep(0)
+        if output_directory == failing_dir:
+            raise BaseAuthError
+        return []
+
+    for api_name in fetcher.all_api_configs["fulltext"]:
+        mocker.patch.object(
+            fetcher.full_text_fetcher.fetchers[api_name.lower()],
+            "fetch_many_full_texts",
+            side_effect=fail_in_failing_dir,
+        )
+
+    [failing], [not_found] = await asyncio.gather(
+        fetch_fulltexts(["10.1000/a"], failing_dir, fetcher),
+        fetch_fulltexts(["10.1000/b"], not_found_dir, fetcher),
+    )
+
+    assert failing.status == Status.ERROR
+    assert not_found.status == Status.NOT_FOUND
+    assert fetcher.full_text_fetcher.fetch == provider_fetch
 
 
 @pytest.mark.parametrize(
