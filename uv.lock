@@ -802,6 +802,7 @@ source = { editable = "." }
 dependencies = [
     { name = "destiny-sdk" },
     { name = "fetch-everything-robot" },
+    { name = "loguru" },
 ]
 
 [package.optional-dependencies]
@@ -828,6 +829,7 @@ test = [
 requires-dist = [
     { name = "destiny-sdk", specifier = ">=0.17.6" },
     { name = "fetch-everything-robot", git = "https://github.com/destiny-evidence/fetch-everything-robot?rev=b9159e4120ca66f04818a36434e319d216b28b62" },
+    { name = "loguru", specifier = ">=0.7.3" },
     { name = "mkdocs", marker = "extra == 'docs'" },
     { name = "mkdocs-include-markdown-plugin", marker = "extra == 'docs'" },
     { name = "mkdocs-material", marker = "extra == 'docs'" },
