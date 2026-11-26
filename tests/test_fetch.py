@@ -1,7 +1,6 @@
 """Tests for fetch orchestration."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -9,12 +8,11 @@ import pytest
 from fer.config import ExternalAPI
 from fer.fetch_fulltext import (
     FullTextBatchFetcher,
-    FullTextFetcher,
-    FullTextResult,
     RetrievedFullText,
 )
 from fer.fetching.core import BaseAuthError, DOIStudyCollection
 from pydantic import SecretStr, ValidationError
+from pytest_mock import MockerFixture
 
 from fetch_everything_pipeline.fetch import (
     FER_FETCH_ERRORS,
