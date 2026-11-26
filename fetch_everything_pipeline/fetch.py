@@ -22,7 +22,6 @@ from fetch_everything_pipeline.dois import prepare_dois
 from fetch_everything_pipeline.models import PipelineResult, Status
 
 DEFAULT_CHUNK_SIZE = 50
-DIRECTORY_RESERVATION_FILENAME = ".fetch-pipeline-reservation"
 
 # Errors that can escape FER's `get_many_fulltext_pdfs_cycling_apis` at the
 # pinned commit.
@@ -120,9 +119,11 @@ async def fetch_fulltexts(
 
     Args:
         dois (list[str]): The input DOIs in the order they were supplied.
-        output_dir (Path): Directory for the fetched files. Created if missing;
+        output_dir (Path): Directory for the fetched files. Created if missing and
             must be empty, so that files from an earlier run can't be reported
-            as fetched.
+            as fetched. Each call needs a directory to itself: concurrent
+            calls or processes (e.g. the ranks of a distributed Azure ML job)
+            must use separate directories.
         fetcher (FullTextBatchFetcher): The fetcher, from `build_fetcher`.
         chunk_size (int): Number of unique DOIs to pass to the fetcher at once.
 
@@ -131,8 +132,7 @@ async def fetch_fulltexts(
 
     Raises:
         ValueError: If `chunk_size` is less than 1.
-        OutputDirectoryError: If `output_dir` can't be reserved, created, or is not
-            empty.
+        OutputDirectoryError: If `output_dir` can't be created or is not empty.
 
     """
     if chunk_size < 1:
@@ -179,17 +179,11 @@ def prepare_output_dir(output_dir: Path) -> None:
     """
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / DIRECTORY_RESERVATION_FILENAME).touch(exist_ok=False)
-        contents = [path.name for path in output_dir.iterdir()]
-    except FileExistsError as reservation_error:
-        error_message = (
-            f"Output directory {output_dir} is already in use by another run"
-        )
-        raise OutputDirectoryError(error_message) from reservation_error
+        is_empty = next(output_dir.iterdir(), None) is None
     except OSError as output_dir_error:
         error_message = f"Cannot use output directory {output_dir}: {output_dir_error}"
         raise OutputDirectoryError(error_message) from output_dir_error
-    if contents != [DIRECTORY_RESERVATION_FILENAME]:
+    if not is_empty:
         error_message = f"Output directory {output_dir} is not empty"
         raise OutputDirectoryError(error_message)
 

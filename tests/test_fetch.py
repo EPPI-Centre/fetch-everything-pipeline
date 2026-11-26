@@ -18,7 +18,6 @@ from pydantic import SecretStr, ValidationError
 from pytest_mock import MockerFixture
 
 from fetch_everything_pipeline.fetch import (
-    DIRECTORY_RESERVATION_FILENAME,
     FER_FETCH_ERRORS,
     OutputDirectoryError,
     build_fetcher,
@@ -460,8 +459,8 @@ def test_build_fetcher_passes_credentials(test_settings: PipelineSettings):
 def test_prepare_output_dir_success(tmp_path: Path):
     output_dir = tmp_path / "pdfs"
     prepare_output_dir(output_dir)
-    assert output_dir.exists()
-    assert (output_dir / DIRECTORY_RESERVATION_FILENAME).exists()
+    assert output_dir.is_dir()
+    assert list(output_dir.iterdir()) == []
 
 
 @pytest.mark.parametrize(
@@ -496,15 +495,10 @@ def test_prepare_output_dir_directory_initially_not_empty(
     assert f"Output directory {output_dir} is not empty" in str(not_empty_error.value)
 
 
-def test_prepare_output_dir_double_call_raises(
-    tmp_path: Path,
-):
+def test_prepare_output_dir_accepts_existing_empty_directory(tmp_path: Path):
     output_dir = tmp_path / "pdfs"
+    output_dir.mkdir()
+
     prepare_output_dir(output_dir)
 
-    with pytest.raises(OutputDirectoryError) as double_call_error:
-        prepare_output_dir(output_dir)
-
-    assert f"Output directory {output_dir} is already in use by another run" in str(
-        double_call_error.value
-    )
+    assert list(output_dir.iterdir()) == []
