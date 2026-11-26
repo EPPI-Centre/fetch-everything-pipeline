@@ -338,7 +338,7 @@ async def test_uploads_manifest_with_timestamp_and_azure_run_id(
     ), "Expected the blob path to start with 'results/'"
     _, timestamp_and_run_id, filename = first_blob.split("/")
     assert re.fullmatch(
-        rf"\d{{8}}T\d{{6}}Z-{test_azure_job_name}", timestamp_and_run_id
+        rf"\d{{8}}T\d{{6}}Z-{test_azure_job_name}-[0-9a-f]{{32}}", timestamp_and_run_id
     )
     assert filename == test_results_file_name
     assert uploaded_files == [(test_manifest_file_content.encode("utf-8"), first_blob)]
@@ -366,10 +366,33 @@ async def test_manifest_uses_azureml_run_id_or_local_uuid_fallback(
     local_settings = blob_settings(PipelineSettings())
     local_blob = await upload_results_manifest(manifest_path, local_settings)
 
-    assert azureml_blob.endswith(f"-{test_azure_job_name}/{test_manifest_file_name}")
+    assert re.fullmatch(
+        rf"results/\d{{8}}T\d{{6}}Z-{test_azure_job_name}-[0-9a-f]{{32}}/{test_manifest_file_name}",
+        azureml_blob,
+    )
     assert local_blob != azureml_blob
     assert local_blob.startswith("results/")
     assert local_blob.endswith(f"/{test_manifest_file_name}")
+
+
+@pytest.mark.usefixtures("test_settings", "mock_blob_client")
+async def test_manifest_names_are_unique_for_same_run_id(
+    uploaded_files: list[tuple[bytes, str]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    manifest_path = tmp_path / "results.jsonl"
+    manifest_path.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setenv("FETCH_PIPELINE_RUN_ID", "shared-run-id")
+    settings = blob_settings(PipelineSettings())
+
+    first_blob = await upload_results_manifest(manifest_path, settings)
+    second_blob = await upload_results_manifest(manifest_path, settings)
+
+    assert (
+        first_blob != second_blob
+    ), "Expected runs sharing a run ID not to overwrite each other's manifest"
+    assert [blob_name for _, blob_name in uploaded_files] == [first_blob, second_blob]
 
 
 @pytest.mark.parametrize("error_type", [(BlobUploadError), (OSError)])

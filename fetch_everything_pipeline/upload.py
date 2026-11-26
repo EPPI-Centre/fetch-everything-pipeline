@@ -161,7 +161,7 @@ async def upload_results_manifest(
         run_id = uuid4().hex
     run_id = re.sub(r"[^A-Za-z0-9._-]+", "-", run_id).strip(".-_") or uuid4().hex
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    blob_name = f"results/{timestamp}-{run_id}/{path.name}"
+    blob_name = f"results/{timestamp}-{run_id}-{uuid4().hex}/{path.name}"
     try:
         with path.open("rb") as results_file:
             storage_client = FetchEverythingBlobStorageClient(settings)
