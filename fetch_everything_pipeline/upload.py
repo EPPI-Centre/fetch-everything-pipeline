@@ -51,7 +51,8 @@ async def upload_results(
     """
     Upload fetched PDFs.
 
-    Records each upload failure without stopping others.
+    Records each upload failure without stopping others. If the blob client
+    can't be created, every fetched result is marked `upload_failed`.
 
     Args:
         results (list[PipelineResult]): Fetch results to update.
@@ -69,7 +70,20 @@ async def upload_results(
         logger.warning("No fetched results to upload. Skipping upload step.")
         return results
 
-    storage_client = FetchEverythingBlobStorageClient(settings)
+    try:
+        storage_client = FetchEverythingBlobStorageClient(settings)
+    except BlobUploadError as client_error:
+        error_message = f"Cannot create blob storage client: {client_error}"
+        logger.error(error_message)
+        return [
+            result.model_copy(
+                update={"status": Status.UPLOAD_FAILED, "error": error_message}
+            )
+            if result.status is Status.FETCHED
+            else result
+            for result in results
+        ]
+
     uploaded_results = []
     outcomes_by_path: dict[Path, tuple[Status, str | None, str | None]] = {}
     for result in results:

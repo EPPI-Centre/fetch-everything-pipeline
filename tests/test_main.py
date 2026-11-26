@@ -3,8 +3,9 @@
 from pathlib import Path
 
 import pytest
+from fer.blob_storage import BlobUploadError
 from fer.fetch_fulltext import FullTextBatchFetcher
-from pytest_mock import MockerFixture
+from pytest_mock import MockerFixture, MockType
 
 import fetch_everything_pipeline
 from fetch_everything_pipeline import (
@@ -229,6 +230,30 @@ def test_main_uploads_before_writing_results(
     assert manifest_blob.endswith(
         f"/{RESULTS_FILE_NAME}"
     ), "Manifest blob should end with the results file name"
+
+
+@pytest.mark.usefixtures("cli_fetcher_with_pdf")
+def test_main_writes_results_when_blob_client_cannot_be_created(
+    mock_blob_client: MockType,
+    input_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("STORAGE_BLOB_ACCOUNT", "testaccount")
+    monkeypatch.setenv("STORAGE_BLOB_CONTAINER", "testcontainer")
+    mock_blob_client.side_effect = BlobUploadError("no credential")
+    output = tmp_path / "out"
+
+    exit_code = main(["--input", str(input_file), "--output", str(output), "--upload"])
+
+    assert exit_code == 1, "The manifest upload also fails, so main should return 1"
+    results = read_results(output / RESULTS_FILE_NAME)
+    assert [result.status for result in results] == [
+        Status.UPLOAD_FAILED,
+        Status.INVALID_DOI,
+        Status.UPLOAD_FAILED,
+        Status.NOT_FOUND,
+    ], "Fetched results should be saved locally as upload_failed"
 
 
 @pytest.mark.usefixtures("test_settings")

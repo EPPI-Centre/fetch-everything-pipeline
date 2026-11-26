@@ -207,6 +207,30 @@ async def test_upload_results_all_failures(
     ), "Expected the blob upload to be called twice, once per fetched result"
 
 
+async def test_upload_results_client_creation_failure_marks_fetched_upload_failed(
+    mock_blob_client: MockType,
+    test_settings: PipelineSettings,
+    tmp_path: Path,
+):
+    mock_blob_client.side_effect = BlobUploadError("no credential")
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"pdf contents")
+    fetched = fetched_result(0, pdf_path)
+    not_found = PipelineResult(index=1, input_doi="10.1000/1", status=Status.NOT_FOUND)
+
+    results = await upload_results([fetched, not_found], blob_settings(test_settings))
+
+    assert (
+        results[0].status is Status.UPLOAD_FAILED
+    ), "Expected the result to be marked as a failed upload when the client cannot be created"
+    assert results[0].error is not None, "Expected the result to have an error message"
+    assert (
+        "no credential" in results[0].error
+    ), "Expected the error to include the client creation failure"
+    assert results[1] is not_found, "Expected non-fetched results to be unchanged"
+    mock_blob_client.return_value.blob_upload.assert_not_called()
+
+
 async def test_upload_results_skips_non_fetched_results(
     mock_blob_client: MockType,
     test_settings: PipelineSettings,
