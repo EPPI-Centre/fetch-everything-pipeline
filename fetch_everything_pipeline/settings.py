@@ -70,9 +70,8 @@ class PipelineSettings(FERSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """
         Add Azure Key Vault as a settings source when `key_vault_url` is set.
-          Add Azure Key Vault as a settings source when `key_vault_url` is set.
 
-        This gets called by pydantic-settings each time the settings are loaded,
+        Called by pydantic-settings each time the settings are loaded,
         not by this code, so isn't actually unused.
 
         The vault comes after the environment and `.env`, so a variable set
