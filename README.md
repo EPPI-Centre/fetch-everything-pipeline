@@ -20,7 +20,7 @@ uv run fetch-pipeline --input dois.txt --output out/ --upload
 - `--chunk-size` (optional, default 50): number of unique DOIs passed to the fetcher at once.
 - `--upload` (optional, for dev/testing use locally): uploads each fetched PDF to the configured container as `<PDF filename stem>-<random-hex>.pdf` with the uploaded name recorded in `blob_name`. It also uploads `results.csv` to `results/<UTC timestamp>-<run-id>-<random-hex>/results.csv` so each run's DOI-to-blob mapping is retained. PDF upload failures are recorded as `upload_failed`, other DOIs continue.
 
-Per-DOI failures are recorded in the results; the command exits with 1 only when the input file, settings or output directory can't be used.
+Per-DOI failures are recorded in the results. The command exits with 1 when configuration, input, fetcher setup, output processing or results manifest upload fails. Local results are written before the manifest upload, so they remain in the output directory even if the upload fails.
 
 ### Results file
 
