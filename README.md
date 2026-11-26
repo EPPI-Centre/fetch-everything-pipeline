@@ -19,12 +19,12 @@ Each result has a `status` of `fetched`, `not_found`, `invalid_doi`, `error` or 
 
 Settings are read from environment variables or a `.env` file in the working directory:
 
-| Variable                     | Required          | Purpose                                            |
-| ---------------------------- | ----------------- | -------------------------------------------------- |
-| `MAILTO`                     | Yes               | Contact email sent to OpenAlex and Unpaywall.      |
-| `OPENALEX_KEY`               | Yes               | OpenAlex API key. Without it, OpenAlex is skipped. |
-| `ELSEVIER_SCOPUS_KEY`        | No                | Scopus API key. Without it, Scopus is skipped.     |
-| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus | Elsevier institution token.                        |
-| `SCOPUS_PROXY_URL`           | No                | Proxy for Scopus requests.                         |
+| Variable                     | Required             | Purpose                                            |
+| ---------------------------- | -------------------- | -------------------------------------------------- |
+| `MAILTO`                     | Yes                  | Contact email sent to OpenAlex and Unpaywall.      |
+| `OPENALEX_KEY`               | No (but recommended) | OpenAlex API key. Without it, OpenAlex is skipped. |
+| `ELSEVIER_SCOPUS_KEY`        | No                   | Scopus API key. Without it, Scopus is skipped.     |
+| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus    | Elsevier institution token.                        |
+| `SCOPUS_PROXY_URL`           | No                   | Proxy for Scopus requests.                         |
 
 The providers in use are logged at the start of each run.
