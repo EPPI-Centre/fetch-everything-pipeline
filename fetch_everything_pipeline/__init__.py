@@ -25,6 +25,13 @@ from fetch_everything_pipeline.models import (
     write_results,
 )
 from fetch_everything_pipeline.settings import PipelineSettings
+from fetch_everything_pipeline.upload import (
+    ResultsManifestUploadError,
+    UploadConfigurationError,
+    upload_results,
+    upload_results_manifest,
+    validate_upload_settings,
+)
 
 PDF_DIR_NAME = "pdfs"
 RESULTS_FILE_NAME = "results.jsonl"
@@ -40,6 +47,8 @@ MAIN_ERRORS: tuple[type[Exception], ...] = (
     VersionInfoNotFoundError,
     OutputDirectoryError,
     ResultsProcessingError,
+    UploadConfigurationError,
+    ResultsManifestUploadError,
 )
 
 
@@ -96,7 +105,7 @@ def parse_args(input_args: Sequence[str] | None) -> argparse.Namespace:
             or None to use command line arguments.
 
     Returns:
-        argparse.Namespace: The parsed `input`, `output` and `chunk_size`.
+        argparse.Namespace: The parsed `input`, `output`, `chunk_size` and `upload`.
 
     Raises:
         SystemExit: If the arguments are invalid, or `--help` is given.
@@ -121,6 +130,11 @@ def parse_args(input_args: Sequence[str] | None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_CHUNK_SIZE,
         help="Number of unique DOIs to fetch at once.",
+    )
+    parser.add_argument(
+        "--upload",
+        action="store_true",
+        help="Upload fetched PDFs to the configured Azure Blob Storage container.",
     )
     args = parser.parse_args(input_args)
     if args.chunk_size < 1:
@@ -148,8 +162,11 @@ def main(input_args: Sequence[str] | None = None) -> int:
     """
     args = parse_args(input_args)
     try:
+        settings = PipelineSettings()
+        if args.upload:
+            validate_upload_settings(settings)
         dois = read_dois(args.input)
-        fetcher = build_fetcher(PipelineSettings())
+        fetcher = build_fetcher(settings)
         prepare_output_dir(args.output)
         enabled_providers_string = ", ".join(
             provider.name for provider in enabled_providers(fetcher)
@@ -158,7 +175,12 @@ def main(input_args: Sequence[str] | None = None) -> int:
         results = asyncio.run(
             fetch_fulltexts(dois, args.output / PDF_DIR_NAME, fetcher, args.chunk_size)
         )
-        write_results(results, args.output / RESULTS_FILE_NAME)
+        if args.upload:
+            results = asyncio.run(upload_results(results, settings))
+        results_path = args.output / RESULTS_FILE_NAME
+        write_results(results, results_path)
+        if args.upload:
+            asyncio.run(upload_results_manifest(results_path, settings))
     except MAIN_ERRORS as main_error:
         logger.error(f"Error: {main_error}")
         return 1
