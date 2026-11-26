@@ -811,7 +811,7 @@ wheels = [
 
 [[package]]
 name = "fetch-everything-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "azure-core" },
@@ -849,7 +849,7 @@ requires-dist = [
     { name = "azure-core", specifier = ">=1.41.0" },
     { name = "azure-identity", specifier = ">=1.27.0" },
     { name = "destiny-sdk", specifier = ">=0.17.6" },
-    { name = "fetch-everything-robot", git = "https://github.com/destiny-evidence/fetch-everything-robot?rev=b9159e4120ca66f04818a36434e319d216b28b62" },
+    { name = "fetch-everything-robot", git = "https://github.com/destiny-evidence/fetch-everything-robot?rev=b6645b0422a544f3957010e9557e7888084d7f3e" },
     { name = "httpx2", specifier = ">=2.16.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mkdocs", marker = "extra == 'docs'" },
@@ -871,8 +871,8 @@ provides-extras = ["dev", "docs", "test"]
 
 [[package]]
 name = "fetch-everything-robot"
-version = "0.3.0"
-source = { git = "https://github.com/destiny-evidence/fetch-everything-robot?rev=b9159e4120ca66f04818a36434e319d216b28b62#b9159e4120ca66f04818a36434e319d216b28b62" }
+version = "0.4.0"
+source = { git = "https://github.com/destiny-evidence/fetch-everything-robot?rev=b6645b0422a544f3957010e9557e7888084d7f3e#b6645b0422a544f3957010e9557e7888084d7f3e" }
 dependencies = [
     { name = "aiohttp" },
     { name = "azure-core" },
