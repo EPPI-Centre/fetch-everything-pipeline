@@ -26,14 +26,14 @@ Each result has a `status` of `fetched`, `not_found`, `invalid_doi`, `error` or 
 
 Settings are read from environment variables or a `.env` file in the working directory:
 
-| Variable                     | Required             | Purpose                                            |
-| ---------------------------- | -------------------- | -------------------------------------------------- |
-| `MAILTO`                     | Yes                  | Contact email sent to OpenAlex and Unpaywall.      |
-| `OPENALEX_KEY`               | No (but recommended) | OpenAlex API key. Without it, OpenAlex is skipped. |
-| `ELSEVIER_SCOPUS_KEY`        | No                   | Scopus API key. Without it, Scopus is skipped.     |
-| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus    | Elsevier institution token.                        |
-| `SCOPUS_PROXY_URL`           | No                   | Proxy for Scopus requests.                         |
-| `STORAGE_BLOB_ACCOUNT`       | With `--upload`      | Azure Storage account name.                        |
-| `STORAGE_BLOB_CONTAINER`     | With `--upload`      | Container to receive the PDFs.                     |
+| Variable                     | Required                                     | Purpose                                            |
+| ---------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| `MAILTO`                     | No (falls back to a default but recommended) | Contact email sent to OpenAlex and Unpaywall.      |
+| `OPENALEX_KEY`               | No (but recommended)                         | OpenAlex API key. Without it, OpenAlex is skipped. |
+| `ELSEVIER_SCOPUS_KEY`        | No                                           | Scopus API key. Without it, Scopus is skipped.     |
+| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus                            | Elsevier institution token.                        |
+| `SCOPUS_PROXY_URL`           | No                                           | Proxy for Scopus requests.                         |
+| `STORAGE_BLOB_ACCOUNT`       | With `--upload`                              | Azure Storage account name.                        |
+| `STORAGE_BLOB_CONTAINER`     | With `--upload`                              | Container to receive the PDFs.                     |
 
-Uploads use `DefaultAzureCredential` (no storage account key is needed): sign in with `az login` locally or assign the Azure ML compute a managed identity with the **Storage Blob Data Contributor** role. `PipelineSettings` reads `FETCH_PIPELINE_RUN_ID` first, then `AZUREML_RUN_ID` if available; if neither is set, a random ID is used. Set `FETCH_PIPELINE_RUN_ID` to the Azure ML job name in the job environment to make manifests easy to identify. The providers in use are logged at the start of each run.
+Uploads use `DefaultAzureCredential` (no storage account key is needed): sign in with `az login` locally or assign the Azure ML compute a managed identity with the **Storage Blob Data Contributor** role. The manifest's run ID comes from `FETCH_PIPELINE_RUN_ID` if set, otherwise `AZUREML_RUN_ID` if available, and a random ID is used if neither is set.
