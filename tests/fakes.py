@@ -22,7 +22,7 @@ def mock_fetch(
 
     Args:
         found (dict[str, str]): Normalised DOI to the source FER would report.
-        fail_on (frozenset[str]): Normalised DOIs whose chunk raises and error.
+        fail_on (frozenset[str]): Normalised DOIs whose chunk raises an error.
         error_type (type[Exception]): The exception raised for `fail_on`.
 
     Returns:
