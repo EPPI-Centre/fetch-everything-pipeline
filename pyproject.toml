@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "fetch-everything-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -99,4 +99,4 @@ exclude-newer = "P5D"
 module-root = ""
 
 [tool.uv.sources]
-fetch-everything-robot = {git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b9159e4120ca66f04818a36434e319d216b28b62"} # pragma: allowlist secret
+fetch-everything-robot = {git = "https://github.com/destiny-evidence/fetch-everything-robot", rev = "b6645b0422a544f3957010e9557e7888084d7f3e"} # pragma: allowlist secret
