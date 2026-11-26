@@ -107,7 +107,7 @@ async def upload_results(
                 blob_name = await asyncio.to_thread(
                     storage_client.blob_upload,
                     data=pdf_file,
-                    filename=result.path.name,
+                    filename=f"{result.path.stem}-{uuid4().hex}.pdf",
                 )
         except (BlobUploadError, OSError) as upload_error:
             error_message = (

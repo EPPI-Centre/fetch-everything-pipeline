@@ -1,5 +1,6 @@
-"""Define mock functionality for testing the core fetcher."""
+"""Define mock functionality and shared helpers for tests."""
 
+import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -72,3 +73,19 @@ def mock_fetch(
         return results[::-1]
 
     return fetch
+
+
+def is_unique_blob_name(blob_name: str | None, path: Path) -> bool:
+    """
+    Check that a blob name is the PDF's stem plus a random hex suffix.
+
+    Args:
+        blob_name (str | None): The blob name to check.
+        path (Path): The local path of the uploaded PDF.
+
+    Returns:
+        bool: True if `blob_name` is `<stem>-<32 hex characters>.pdf`.
+
+    """
+    pattern = rf"{re.escape(path.stem)}-[0-9a-f]{{32}}\.pdf"
+    return blob_name is not None and re.fullmatch(pattern, blob_name) is not None

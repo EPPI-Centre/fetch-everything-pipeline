@@ -17,6 +17,7 @@ from fetch_everything_pipeline.upload import (
     upload_results_manifest,
     validate_upload_settings,
 )
+from tests.fakes import is_unique_blob_name
 
 
 def fetched_result(index: int, path: Path) -> PipelineResult:
@@ -79,20 +80,19 @@ async def test_upload_results_uploads_fetched_files_and_preserves_duplicates(
         Status.NOT_FOUND,
         Status.FETCHED,
     ]
-    assert (
-        results[0].blob_name == pdf_filename
-    ), "Expected the first result to have the correct blob name"
+    assert is_unique_blob_name(
+        results[0].blob_name, pdf_path
+    ), "Expected the first result's blob name to be the PDF stem plus a unique suffix"
     assert (
         results[1] is not_found
     ), "Expected the second result to be the not found result"
     assert (
-        results[2].blob_name == pdf_filename
-    ), "Expected the duplicate result to have the correct blob name"
-    assert uploaded_files == [(pdf_content, pdf_filename)]
-    (
-        mock_blob_client.assert_called_once(),
-        "Expected blob client to be called once: the duplicate should not trigger another upload",
-    )
+        results[2].blob_name == results[0].blob_name
+    ), "Expected the duplicate result to share the first result's blob name"
+    assert uploaded_files == [(pdf_content, results[0].blob_name)]
+    assert (
+        mock_blob_client.return_value.blob_upload.call_count == 1
+    ), "Expected one upload: the duplicate should reuse the first upload"
 
 
 async def test_upload_results_single_failure_does_not_stop_later_uploads(
@@ -131,10 +131,37 @@ async def test_upload_results_single_failure_does_not_stop_later_uploads(
     ), "Expected the error message to contain 'permission denied'"
     assert (
         results[1].blob_name == "second.pdf"
-    ), "Expected the second result to have the correct blob name"
+    ), "Expected the second result to record the blob name the client returned"
+    assert is_unique_blob_name(
+        blob_upload.call_args.kwargs["filename"], second_path
+    ), "Expected the second upload to use the PDF stem plus a unique suffix"
     assert (
         blob_upload.call_count == 2
     ), "Expected the blob upload to be called twice, once per fetched result"
+
+
+async def test_upload_results_uses_new_blob_name_for_each_run(
+    mock_blob_client: MockType,
+    uploaded_files: list[tuple[bytes, str]],
+    test_settings: PipelineSettings,
+    tmp_path: Path,
+):
+    pdf_path = tmp_path / "paper.pdf"
+    pdf_path.write_bytes(b"pdf contents")
+    settings = blob_settings(test_settings)
+
+    [first_run] = await upload_results([fetched_result(0, pdf_path)], settings)
+    [second_run] = await upload_results([fetched_result(0, pdf_path)], settings)
+
+    assert is_unique_blob_name(first_run.blob_name, pdf_path)
+    assert is_unique_blob_name(second_run.blob_name, pdf_path)
+    assert (
+        first_run.blob_name != second_run.blob_name
+    ), "Expected a later run not to reuse, and so overwrite, an earlier run's blob"
+    assert [blob_name for _, blob_name in uploaded_files] == [
+        first_run.blob_name,
+        second_run.blob_name,
+    ]
 
 
 async def test_upload_results_all_failures(
@@ -234,11 +261,14 @@ async def test_upload_results_reuses_upload_outcome_for_same_path_result(
         first_result.status,
         second_result.status,
     ]
-    assert all(
-        result.blob_name is not None for result in results
-    ), "Expected all results to have a blob name"
+    assert is_unique_blob_name(
+        results[0].blob_name, first_path
+    ), "Expected the first result's blob name to be the PDF stem plus a unique suffix"
     assert (
-        mock_blob_client.call_count == 1
+        results[1].blob_name == results[0].blob_name
+    ), "Expected the same-path result to share the first upload's blob name"
+    assert (
+        mock_blob_client.return_value.blob_upload.call_count == 1
     ), "Expected the blob upload to be called once, as the second result reuses the first upload"
 
 

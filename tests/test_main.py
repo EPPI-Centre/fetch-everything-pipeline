@@ -19,7 +19,7 @@ from fetch_everything_pipeline import (
 from fetch_everything_pipeline.fetch import DEFAULT_CHUNK_SIZE
 from fetch_everything_pipeline.models import PipelineResult, Status, read_results
 from fetch_everything_pipeline.settings import PipelineSettings
-from tests.fakes import mock_fetch
+from tests.fakes import is_unique_blob_name, mock_fetch
 
 
 @pytest.fixture
@@ -218,8 +218,11 @@ def test_main_uploads_before_writing_results(
         pdf_bytes == first_result.path.read_bytes()
     ), "PDF bytes should match the first result's path content"
     assert (
-        first_result.blob_name == pdf_blob == first_result.path.name
-    ), "Blob name and path name should match the uploaded PDF blob"
+        first_result.blob_name == pdf_blob
+    ), "The result's blob name should match the uploaded PDF blob"
+    assert is_unique_blob_name(
+        pdf_blob, first_result.path
+    ), "The PDF blob name should be the PDF stem plus a unique suffix"
     assert (
         manifest_bytes == results_path.read_bytes()
     ), "Manifest bytes should match the content of the results file"
