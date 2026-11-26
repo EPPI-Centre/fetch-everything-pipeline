@@ -6,6 +6,7 @@ import pytest
 from azure.core.exceptions import ClientAuthenticationError
 from fer.config import Settings as FERSettings
 from pydantic import ValidationError
+from pydantic_settings import SettingsError
 from pytest_mock import MockerFixture, MockType
 
 from fetch_everything_pipeline.settings import (
@@ -16,6 +17,27 @@ from fetch_everything_pipeline.settings import (
 from tests.fakes import fill_vault
 
 TEST_KEY_VAULT_URL = "https://test-vault.vault.azure.net/"
+
+
+def raise_settings_error_from(cause: Exception) -> None:
+    """
+    Raise a `SettingsError` chained from `cause`, as pydantic-settings does.
+
+    pydantic-settings wraps an error from a field's lookup in `SettingsError`
+    Failures listing secrets arrive unwrapped.
+    Failures reading a secret arrive as `SettingsError`.
+
+    This function simulates that behavior for testing purposes.
+
+    Args:
+        cause (Exception): The error to chain from.
+
+    Raises:
+        SettingsError: Always raised with `cause` as its `__cause__`.
+
+    """
+    error_message = "error getting value for field from Key Vault"
+    raise SettingsError(error_message) from cause
 
 
 @pytest.fixture
@@ -157,6 +179,60 @@ def test_load_settings_reports_key_vault_errors(
 
     with pytest.raises(SettingsLoadError, match="access denied"):
         load_settings()
+
+
+@pytest.mark.usefixtures("test_settings")
+def test_load_settings_reports_key_vault_errors_reading_secrets(
+    mock_secret_client: MockType, monkeypatch: pytest.MonkeyPatch
+):
+    """
+    Test that `load_settings` reports key vault errors when reading secrets.
+
+    Listing succeeds but `get_secret` fails, pydantic-settings
+    wraps that in a `SettingsError` unlike listing failures.
+
+    """
+    monkeypatch.delenv("OPENALEX_KEY")
+    monkeypatch.setenv("KEY_VAULT_URL", TEST_KEY_VAULT_URL)
+    fill_vault(mock_secret_client, {"openalex-key": "dummy-vault-openalex-key"})
+    mock_secret_client.return_value.get_secret.side_effect = ClientAuthenticationError(
+        "read permission denied"
+    )
+
+    with pytest.raises(SettingsLoadError, match="read permission denied"):
+        load_settings()
+
+
+def test_load_settings_translates_azure_caused_settings_error(mocker: MockerFixture):
+    """
+    Test that `load_settings` translates an Azure-caused settings error.
+
+    Checks that this is translated into a `SettingsLoadError`.
+
+    """
+    azure_error = ClientAuthenticationError("get permission denied")
+    mocker.patch(
+        "fetch_everything_pipeline.settings.PipelineSettings",
+        side_effect=lambda: raise_settings_error_from(azure_error),
+    )
+    with pytest.raises(SettingsLoadError, match="get permission denied") as excinfo:
+        load_settings()
+
+    assert isinstance(excinfo.value.__cause__, SettingsError)
+    assert excinfo.value.__cause__.__cause__ is azure_error
+
+
+def test_load_settings_reports_unrelated_settings_errors(mocker: MockerFixture):
+    """Test that `load_settings` reports non-Azure settings errors with their own text."""
+    mocker.patch(
+        "fetch_everything_pipeline.settings.PipelineSettings",
+        side_effect=lambda: raise_settings_error_from(ValueError("unrelated error")),
+    )
+    with pytest.raises(SettingsLoadError, match="error getting value") as excinfo:
+        load_settings()
+
+    assert isinstance(excinfo.value.__cause__, SettingsError)
+    assert str(excinfo.value.__cause__.__cause__) == "unrelated error"
 
 
 @pytest.mark.usefixtures("test_settings")

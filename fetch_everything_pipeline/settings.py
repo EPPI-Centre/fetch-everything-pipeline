@@ -8,11 +8,12 @@ from pydantic_settings import (
     AzureKeyVaultSettingsSource,
     BaseSettings,
     PydanticBaseSettingsSource,
+    SettingsError,
 )
 
 
 class SettingsLoadError(Exception):
-    """Raised when settings cannot be read from Azure Key Vault."""
+    """Raised when settings cannot be loaded."""
 
 
 class PipelineSettings(FERSettings):
@@ -123,12 +124,15 @@ def load_settings() -> PipelineSettings:
             `key_vault_url` is set, Azure Key Vault.
 
     Raises:
-        SettingsLoadError: If Key Vault can't be reached or authenticated with.
+        SettingsLoadError: If the settings cannot be read,
+            or failures in secret listing and reading.
         ValidationError: If a setting has an invalid value.
 
     """
     try:
         return PipelineSettings()
-    except AzureError as key_vault_error:
-        error_message = f"Cannot read settings from Azure Key Vault: {key_vault_error}"
-        raise SettingsLoadError(error_message) from key_vault_error
+    except (AzureError, SettingsError) as settings_error:
+        cause = settings_error.__cause__
+        detail = cause if isinstance(cause, AzureError) else settings_error
+        error_message = f"Cannot load settings: {detail}"
+        raise SettingsLoadError(error_message) from settings_error
