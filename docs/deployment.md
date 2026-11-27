@@ -19,7 +19,7 @@ The endpoint URL stays consistent and defaults to the latest deployment. Callers
 
 Environment and component versions are immutable. Once a version is registered, it can't be overwritten or reused, even if it was registered by mistake. To fix a registered version, register the next one.
 
-Each layer has its own version number, so the numbers don't have to match. If only the pipeline component's defaults change, for example, register a new pipeline component version and leave the environment and command component alone. Name each deployment after the pipeline component version it runs (`fetch-everything-v4` runs `eppi_fetch_everything_pipeline:4`).
+Each layer has its own version number, so the numbers don't have to match. If only the pipeline component's defaults change, for example, register a new pipeline component version and leave the environment and command component alone. Name each deployment after the pipeline component version it runs (`fetch-everything-vN` runs `eppi_fetch_everything_pipeline:N`).
 
 Deployments can be changed, but in this repo follow the pattern of creating a new one for each release to enable rollbacks.
 
