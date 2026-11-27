@@ -67,7 +67,7 @@ class PipelineSettings(FERSettings):
     )
     wait_time_openalex: float = Field(
         ge=0,
-        default=0.0,
+        default=0.1,
         description="Wait time for OpenAlex requests in seconds.",
     )
     wait_time_crossref: int = Field(

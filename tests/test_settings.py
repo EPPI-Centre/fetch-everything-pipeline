@@ -67,7 +67,7 @@ def test_loads_with_only_defaults(test_settings: PipelineSettings):
     assert test_settings.STORAGE_BLOB_ACCOUNT_KEY is None
     assert test_settings.key_vault_url is None
     assert test_settings.use_scopus is False
-    assert test_settings.wait_time_openalex == 0.0
+    assert test_settings.wait_time_openalex == 0.1
     assert test_settings.wait_time_crossref == 0
 
 

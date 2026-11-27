@@ -28,7 +28,7 @@ inputs:
     description: Fetch from Scopus too. Off by default and also needs the Scopus key.
   wait_time_openalex:
     type: number
-    default: 0
+    default: 0.1
     description: >-
       Seconds to wait after each DOI fetched from OpenAlex. Raise this when
       several jobs share one OpenAlex key.
