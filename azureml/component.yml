@@ -5,7 +5,7 @@ display_name: Fetch full texts
 description: >-
   Fetch full-text PDFs for a file of DOIs, one per line. Writes results.csv
   (one row per input line) and the PDFs under pdfs/ to the output folder.
-version: "6"
+version: "7"
 is_deterministic: false
 
 environment: azureml:eppi-fetch-everything-env@latest
@@ -26,6 +26,16 @@ inputs:
     type: boolean
     default: false
     description: Fetch from Scopus too. Off by default and also needs the Scopus key.
+  wait_time_openalex:
+    type: number
+    default: 0.1
+    description: >-
+      Seconds to wait after each DOI fetched from OpenAlex. Raise this when
+      several jobs share one OpenAlex key.
+  wait_time_crossref:
+    type: integer
+    default: 0
+    description: Seconds to wait after each PDF downloaded via Crossref.
 
 outputs:
   results:
@@ -40,4 +50,6 @@ outputs:
 command: >-
   env KEY_VAULT_URL='${{inputs.key_vault_url}}' MAILTO='${{inputs.mailto}}'
   USE_SCOPUS=${{inputs.use_scopus}}
+  WAIT_TIME_OPENALEX=${{inputs.wait_time_openalex}}
+  WAIT_TIME_CROSSREF=${{inputs.wait_time_crossref}}
   fetch-pipeline --input "${{inputs.dois}}" --output "${{outputs.results}}"

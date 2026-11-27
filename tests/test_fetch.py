@@ -11,6 +11,8 @@ from fer.fetch_fulltext import (
     RetrievedFullText,
 )
 from fer.fetching.core import BaseAuthError, DOIStudyCollection
+from fer.fetching.crossref import CrossrefFetcher
+from fer.fetching.openalex import OpenalexFetcher
 from pydantic import SecretStr, ValidationError
 from pytest_mock import MockerFixture
 
@@ -411,6 +413,31 @@ def test_build_fetcher_passes_credentials(test_settings: PipelineSettings):
     )
     assert openalex.query_params is not None
     assert openalex.query_params["mailto"] == "pipeline@example.org"
+
+
+def test_build_fetcher_overrides_fer_wait_times(test_settings: PipelineSettings):
+    """The settings' wait times replace the ones FER builds its fetchers with."""
+    test_openalex_wait_time = 99.9
+    test_crossref_wait_time = 99
+    settings = test_settings.model_copy(
+        update={
+            "wait_time_openalex": test_openalex_wait_time,
+            "wait_time_crossref": test_crossref_wait_time,
+        }
+    )
+
+    fetchers = build_fetcher(settings).full_text_fetcher.fetchers
+
+    assert OpenalexFetcher(settings).wait_time_seconds != test_openalex_wait_time
+    assert CrossrefFetcher(settings).wait_time_seconds != test_crossref_wait_time
+    assert (
+        fetchers[ExternalAPI.OPENALEX.value].wait_time_seconds
+        == test_openalex_wait_time
+    )
+    assert (
+        fetchers[ExternalAPI.CROSSREF.value].wait_time_seconds
+        == test_crossref_wait_time
+    )
 
 
 def test_prepare_output_dir_success(tmp_path: Path):
