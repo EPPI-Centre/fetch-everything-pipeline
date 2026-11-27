@@ -1,0 +1,48 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineComponent.schema.json
+type: pipeline
+name: eppi_fetch_everything_pipeline
+display_name: Eppi fetch everything pipeline
+description: >-
+  Fetch full-text PDFs for a DOI file. Deployed behind the batch endpoint.
+  Each call supplies the DOI file (dois) and a new output folder (results).
+version: "2"
+inputs:
+  dois:
+    type: uri_file
+    description: Text file with one DOI per line, e.g. inbox/<batch-id>.txt.
+  key_vault_url:
+    type: string
+    description: >-
+      Key Vault holding the provider keys. No default is set here: supply one
+      when registering, or pass it on each invocation.
+  mailto:
+    type: string
+    default: example@example.com
+  use_scopus:
+    type: boolean
+    default: false
+    description: Fetch from Scopus too. Off by default; also needs the Scopus key.
+
+outputs:
+  results:
+    type: uri_folder
+    description: A new folder per run, e.g. runs/<batch-id>/. Gets results.csv and pdfs/.
+    mode: upload
+
+jobs:
+  fetch:
+    type: command
+    component: azureml:eppi_fetch_everything@latest
+    compute: azureml:eppi-fetch-everything-cpu
+    # Uses cluster system-assigned identity, which can read Key Vault
+    identity:
+      type: managed
+    limits:
+      timeout: 3600
+    inputs:
+      dois: ${{parent.inputs.dois}}
+      key_vault_url: ${{parent.inputs.key_vault_url}}
+      mailto: ${{parent.inputs.mailto}}
+      use_scopus: ${{parent.inputs.use_scopus}}
+    outputs:
+      results: ${{parent.outputs.results}}

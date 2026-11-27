@@ -1,0 +1,9 @@
+$schema: https://azuremlschemas.azureedge.net/latest/batchEndpoint.schema.json
+# Endpoint becomes https://<name>.<region>.inference.ml.azure.com/jobs
+# Endpoint name must be unique within the region.
+name: fetch-everything-pipeline
+description: Fetch full-text PDFs for a DOI file.
+# Batch endpoints only support Entra ID (aad token)
+# callers need a token and a workspace role that allows invoking batch endpoints.
+# See https://learn.microsoft.com/en-us/azure/machine-learning/how-to-authenticate-batch-endpoint
+auth_mode: aad_token

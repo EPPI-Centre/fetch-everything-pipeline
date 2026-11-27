@@ -72,6 +72,7 @@ Settings are read from environment variables or a `.env` file in the working dir
 | `STORAGE_BLOB_ACCOUNT`       | With `--upload`                              | Azure Storage account name.                        |
 | `STORAGE_BLOB_CONTAINER`     | With `--upload`                              | Container to receive the PDFs.                     |
 | `KEY_VAULT_URL`              | No                                           | Azure Key Vault to read the settings above from.   |
+| `USE_SCOPUS`                 | No                                           | `true` to fetch from Scopus. Off by default.       |
 
 #### Keeping API keys in Azure Key Vault
 

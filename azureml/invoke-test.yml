@@ -1,0 +1,12 @@
+# To be used locally to invoke tests of the fetch-everything-pipeline batch endpoint
+# This file specifies the inputs and outputs for a test call to the batch endpoint.
+# Run this with:
+#   az ml batch-endpoint invoke -n fetch-everything-pipeline -f azureml/invoke-test.yml
+inputs:
+  dois:
+    type: uri_file
+    path: azureml://datastores/eppi_fetch_everything_datastore/paths/UI/2026-11-19_215819_UTC/test_dois.txt
+outputs:
+  results:
+    type: uri_folder
+    path: azureml://datastores/eppi_fetch_everything_datastore/paths/runs/endpoint-test-v2-1/
