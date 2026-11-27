@@ -8,6 +8,7 @@ from uuid import UUID
 import httpx2
 from fer.config import ExternalAPI, external_api_priority
 from fer.fetch_fulltext import (
+    BasePublisherFetcher,
     FullTextBatchFetcher,
     FullTextFetcherError,
     FullTextResult,
@@ -85,7 +86,15 @@ def build_fetcher(settings: PipelineSettings) -> FullTextBatchFetcher:
 
     """
     exclude_api = None if settings.use_scopus else [ExternalAPI.SCOPUS]
-    return prepare_processor(settings, exclude_api).fulltext_fetcher
+    fulltext_batch_fetcher: FullTextBatchFetcher = prepare_processor(
+        settings, exclude_api
+    ).fulltext_fetcher
+    fetchers: dict[str, BasePublisherFetcher] = (
+        fulltext_batch_fetcher.full_text_fetcher.fetchers
+    )
+    fetchers["openalex"].wait_time_seconds = settings.wait_time_openalex
+    fetchers["crossref"].wait_time_seconds = settings.wait_time_crossref
+    return fulltext_batch_fetcher
 
 
 def enabled_providers(fetcher: FullTextBatchFetcher) -> list[ExternalAPI]:

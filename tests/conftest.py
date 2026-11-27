@@ -132,6 +132,8 @@ def test_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PipelineSe
     monkeypatch.delenv("AZUREML_RUN_ID", raising=False)
     monkeypatch.delenv("KEY_VAULT_URL", raising=False)
     monkeypatch.delenv("USE_SCOPUS", raising=False)
+    monkeypatch.delenv("WAIT_TIME_OPENALEX", raising=False)
+    monkeypatch.delenv("WAIT_TIME_CROSSREF", raising=False)
     return PipelineSettings()
 
 

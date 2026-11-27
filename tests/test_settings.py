@@ -57,7 +57,7 @@ def mock_secret_client(mocker: MockerFixture) -> MockType:
     return secret_client
 
 
-def test_loads_with_only_mailto_and_openalex_key(test_settings: PipelineSettings):
+def test_loads_with_only_defaults(test_settings: PipelineSettings):
     assert test_settings.mailto == "pipeline@example.org"
     assert test_settings.openalex_key is not None
     assert test_settings.openalex_key.get_secret_value() == "openalex-test-key"
@@ -65,6 +65,39 @@ def test_loads_with_only_mailto_and_openalex_key(test_settings: PipelineSettings
     assert test_settings.STORAGE_BLOB_ACCOUNT is None
     assert test_settings.STORAGE_BLOB_CONTAINER is None
     assert test_settings.STORAGE_BLOB_ACCOUNT_KEY is None
+    assert test_settings.key_vault_url is None
+    assert test_settings.use_scopus is False
+    assert test_settings.wait_time_openalex == 0.0
+    assert test_settings.wait_time_crossref == 0
+
+
+@pytest.mark.parametrize(
+    ("variable", "value", "field", "expected"),
+    [
+        ("WAIT_TIME_OPENALEX", "0.5", "wait_time_openalex", 0.5),
+        ("WAIT_TIME_CROSSREF", "3", "wait_time_crossref", 3),
+    ],
+)
+@pytest.mark.usefixtures("test_settings")
+def test_loads_wait_times_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    variable: str,
+    value: str,
+    field: str,
+    expected: float,
+):
+    monkeypatch.setenv(variable, value)
+
+    assert getattr(PipelineSettings(), field) == expected
+
+
+@pytest.mark.parametrize("variable", ["WAIT_TIME_OPENALEX", "WAIT_TIME_CROSSREF"])
+@pytest.mark.usefixtures("test_settings")
+def test_negative_wait_times_rejected(monkeypatch: pytest.MonkeyPatch, variable: str):
+    monkeypatch.setenv(variable, "-1")
+
+    with pytest.raises(ValidationError):
+        PipelineSettings()
 
 
 def test_fer_settings_still_require_robot_fields(test_settings: PipelineSettings):

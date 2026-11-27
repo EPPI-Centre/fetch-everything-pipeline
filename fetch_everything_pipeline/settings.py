@@ -65,6 +65,18 @@ class PipelineSettings(FERSettings):
         default=False,
         description="Fetch from Scopus. Also needs the Scopus key.",
     )
+    wait_time_openalex: float = Field(
+        ge=0,
+        default=0.0,
+        description="Wait time for OpenAlex requests in seconds.",
+    )
+    wait_time_crossref: int = Field(
+        ge=0,
+        default=0,
+        description=(
+            "Wait time for Crossref in seconds. Integer in the upstream FER object."
+        ),
+    )
 
     @classmethod
     def settings_customise_sources(
