@@ -163,6 +163,17 @@ def test_read_rejects_unparseable_file(tmp_path: Path):
         read_results(path)
 
 
+def test_read_rejects_unterminated_quote(tmp_path: Path, results: list[PipelineResult]):
+    path = tmp_path / "results.csv"
+    write_results(results, path)
+    header, first, *rest = path.read_text(encoding="utf-8").splitlines()
+    path.write_text(
+        "\n".join([header, f'{first}"unterminated', *rest]) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ResultsProcessingError, match="Failed to parse"):
+        read_results(path)
+
+
 def test_read_reports_missing_file(tmp_path: Path):
     with pytest.raises(ResultsProcessingError, match="Failed to read"):
         read_results(tmp_path / "missing.csv")

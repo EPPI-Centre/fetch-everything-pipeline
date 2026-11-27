@@ -144,7 +144,7 @@ def read_results(path: Path) -> list[PipelineResult]:
         with path.open(encoding="utf-8", newline="") as f:
             return [
                 PipelineResult.model_validate(empty_cells_to_none(row))
-                for row in csv.DictReader(f)
+                for row in csv.DictReader(f, strict=True)
             ]
     except (OSError, UnicodeDecodeError) as result_read_error:
         error_message = f"Failed to read results from {path}: {result_read_error}"
