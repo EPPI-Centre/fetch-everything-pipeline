@@ -124,5 +124,5 @@ Make the previous deployment the default again:
 
 ```bash
 az ml batch-endpoint update -n fetch-everything-pipeline \
-  --set defaults.deployment_name=fetch-everything-v<N-1> -g <rg> -w <ws>
+  --set defaults.deployment_name=fetch-everything-v<previous-version-number> -g <rg> -w <ws>
 ```
