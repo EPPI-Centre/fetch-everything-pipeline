@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Awaitable, Callable
+from json import JSONDecodeError
 from pathlib import Path
 
 from fer.fetch_fulltext import FullTextResult
@@ -10,6 +11,28 @@ from pydantic import BaseModel, ConfigDict
 from pytest_mock import MockType
 
 FakeFetch = Callable[..., Awaitable[list[FullTextResult]]]
+
+
+def make_error(error_type: type[Exception], message: str) -> Exception:
+    """
+    Build an exception of `error_type` with `message`.
+
+    `JSONDecodeError` and `UnicodeDecodeError` need extra constructor arguments
+    and can't be constructed with just a message, as other errors can.
+
+    Args:
+        error_type (type[Exception]): The exception class to build.
+        message (str): The message to include.
+
+    Returns:
+        Exception: The exception instance.
+
+    """
+    if error_type is JSONDecodeError:
+        return JSONDecodeError(message, "", 0)
+    if error_type is UnicodeDecodeError:
+        return UnicodeDecodeError("utf-8", b"\xff", 0, 1, message)
+    return error_type(message)
 
 
 def mock_fetch(
@@ -58,7 +81,7 @@ def mock_fetch(
             doi = study.doi.identifier
             if doi in fail_on:
                 error_message = f"Error on {doi}"
-                raise error_type(error_message)
+                raise make_error(error_type, error_message)
             source = found.get(doi)
             path = output_directory / f"{study.uid}.pdf" if source else None
             if path is not None:
