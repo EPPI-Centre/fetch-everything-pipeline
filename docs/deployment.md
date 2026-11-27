@@ -1,6 +1,6 @@
 # Releasing a new version
 
-The pipeline runs in Azure ML behind the `fetch-everything-pipeline` batch endpoint. A release builds a new container image and registers new versions of each layer on top of it. Then it adds a new deployment to the endpoint and makes that deployment the default.
+The pipeline runs in Azure ML behind the `fetch-everything-pipeline` batch endpoint. A release builds a new container image and registers new versions of each layer on top of it. Then it adds a new deployment to the endpoint, tests it, and makes it the default.
 
 ```mermaid
 flowchart LR
@@ -19,17 +19,19 @@ The endpoint URL stays consistent and defaults to the latest deployment. Callers
 
 Environment and component versions are immutable. Once a version is registered, it can't be overwritten or reused, even if it was registered by mistake. To fix a registered version, register the next one.
 
-Each layer has its own version number, so the numbers don't have to match. If only the pipeline component's defaults change, for example, register a new pipeline component version and leave the environment and command component alone. Name each deployment after the pipeline component version it runs (`fetch-everything-vN` runs `eppi_fetch_everything_pipeline:N`).
+Each layer has its own version number, so the numbers don't have to match, and skipping a number is fine. Using the same `N` for every layer in a release makes it easy to see which versions belong together. Name each deployment after the pipeline component version it runs (`fetch-everything-vN` runs `eppi_fetch_everything_pipeline:N`).
 
 Deployments can be changed, but in this repo follow the pattern of creating a new one for each release to enable rollbacks.
 
 ## Steps
 
-Placeholders: `<acr>` is the workspace's container registry, `<sha>` is the commit being released, and `N` is the next version of each layer.
+Placeholders: `<acr>` is the workspace's container registry, `<sha>` is the commit being released, `N` is the next version of each layer, and `<rg>` and `<ws>` are the resource group and Azure ML workspace. Instead of passing `-g <rg> -w <ws>` each time, you can set them once with `az configure --defaults group=<rg> workspace=<ws>`.
+
+All steps need the Azure CLI with the `ml` extension installed, signed in with `az login` to the subscription that holds the workspace and container registry.
 
 ### 1. Commit the change
 
-`az acr build` uploads the contents of the current directory filtered by `.dockerignore`. Make sure you don't commit any untracked or modified files and that the working tree is clean so the image matches the SHA it's tagged with.
+`az acr build` uploads the contents of the current directory, filtered by `.dockerignore`. Commit everything and make sure the working tree is clean, so the image matches the SHA it's tagged with.
 
 ```bash
 git status   # <- should show no changes
@@ -37,73 +39,90 @@ git status   # <- should show no changes
 
 ### 2. Build and push the image
 
-Requires Azure CLI with the `ml` extension installed, and authentication against the Azure subscription containing the container registry with `az login`.
-
 ```bash
 az acr build -r <acr> -t fetch-everything-pipeline:<sha> --platform linux/amd64 .
 ```
 
 ### 3. Register the environment
 
-The environment runs the image as it is. If you try and create this via the UI, a conda file is mentioned. That's omitted entirely here.
+The environment runs the image as it is. If you create it in the UI instead, a conda file is mentioned, but it's omitted entirely here as the image already contains all dependencies.
 
 ```bash
 az ml environment create --name eppi-fetch-everything-env --version N \
-  --image <acr>.azurecr.io/fetch-everything-pipeline:<sha>
+  --image <acr>.azurecr.io/fetch-everything-pipeline:<sha> -g <rg> -w <ws>
 ```
 
-### 4. Register the command component
+### 4. Register the components
 
-Bump `version` in `azureml/component.yml`, then:
+Bump `version` in `azureml/component.yml` and `azureml/pipeline-component.yml`. Check that the `mailto` default in `azureml/pipeline-component.yml` is the real contact address, not a placeholder.
+
+Then register both components with `azureml/register.sh`:
 
 ```bash
-az ml component create -f azureml/component.yml
+KEY_VAULT_URL=https://<vault>.vault.azure.net/ \
+  azureml/register.sh -g <rg> -w <ws>
 ```
 
-The component uses `eppi-fetch-everything-env@latest` (the latest commit, or version of the deployed image), so register the environment (step 3) first.
+The script:
 
-### 5. Register the pipeline component
+- stops if `KEY_VAULT_URL` is unset or empty, and at the first command that fails.
+- registers the command component first, then the pipeline component. Each refers to the layer below with `@latest`, which is resolved to the most recently registered version when the component is registered. So the environment (step 3) must be registered before the command component, and the command component before the pipeline component.
+- sets `KEY_VAULT_URL` as the registered pipeline component's `key_vault_url` default with `--set`. The vault URL is kept out of the repo, so `pipeline-component.yml` has no default for it. Callers that omit `key_vault_url` (ADF, `invoke-test.yml`) rely on this registered default.
+- passes any extra arguments, such as `-g` and `-w`, to both `az ml component create` calls.
 
-Bump `version` in `azureml/pipeline-component.yml`. Before registering, check that the `key_vault_url` and `mailto` defaults are the real values, not placeholders. Callers rely on these defaults. With a placeholder vault URL, every call exits with code 1, and fixing it takes a new version.
+### 5. Check what was registered
 
 ```bash
-az ml component create -f azureml/pipeline-component.yml
+az ml component show --name eppi_fetch_everything_pipeline --version N -g <rg> -w <ws> --query inputs
+az ml component show --name eppi_fetch_everything --version N -g <rg> -w <ws> --query environment
 ```
 
-The pipeline component uses `eppi_fetch_everything@latest`, so register the command component (step 4) first.
+`key_vault_url` should have the real vault URL as its default, and the command component's environment should end in `/versions/N` (the environment from step 3). If either is wrong, stop here and register the next version. Nothing is deployed yet.
 
 ### 6. Create the deployment
 
-In `azureml/deployment.yml`, set `name` to `fetch-everything-vN` and `component` to `azureml:eppi_fetch_everything_pipeline:N`, then:
+In `azureml/deployment.yml`, set `name` to `fetch-everything-vN`, `component` to `azureml:eppi_fetch_everything_pipeline:N`, and update the description. Then create the deployment without making it the default:
 
 ```bash
-az ml batch-deployment create -f azureml/deployment.yml --set-default -g <resource-group> -w <azure-ml-workspace>
+az ml batch-deployment create -f azureml/deployment.yml -g <rg> -w <ws>
 ```
 
-Note that passing `--set-default` makes this deployment the default immediately.
+Check that the endpoint's default is still the previous deployment, so callers aren't affected yet:
 
-Then check which deployment is the default:
-
-Test it straight away (step 7) and switch the default back (see [Rolling back](#rolling-back)) if this fails.
+```bash
+az ml batch-endpoint show -n fetch-everything-pipeline -g <rg> -w <ws> --query defaults
+```
 
 ### 7. Test the deployment by name
 
-Point the `results` output path in `azureml/invoke-test.yml` at a folder that doesn't exist yet, for example `runs/endpoint-test-vN-1/`. Output folders must be new for every call. Then:
+Point the `results` output path in `azureml/invoke-test.yml` at a folder that doesn't exist yet, for example `runs/endpoint-test-vN-1/`. Output folders must be new for every call. `invoke-test.yml` leaves out `key_vault_url`, as ADF does, so this also checks the registered default. Then:
 
 ```bash
 az ml batch-endpoint invoke -n fetch-everything-pipeline \
-  --deployment-name fetch-everything-vN -f azureml/invoke-test.yml
+  --deployment-name fetch-everything-vN -f azureml/invoke-test.yml -g <rg> -w <ws>
 ```
 
 The test passes when:
 
-- the job completes and `results.csv` is in the output folder;
+- the job completes and `results.csv` is in the output folder.
 - `std_log.txt` lists the providers you expect (`Enabled providers: ...`).
+
+If it fails, the previous deployment is still the default, so callers are unaffected. Fix the problem and release the next version.
+
+### 8. Make it the default
+
+```bash
+az ml batch-endpoint update -n fetch-everything-pipeline \
+  --set defaults.deployment_name=fetch-everything-vN -g <rg> -w <ws>
+```
+
+Then tag the released commit, for example `git tag vN-deployment <sha>`, so you can find what each deployment runs.
 
 ## Rolling back
 
 Make the previous deployment the default again:
 
 ```bash
-az ml batch-endpoint update -n fetch-everything-pipeline --set defaults.deployment_name=fetch-everything-v<N-1> -g <resource-group> -w <azure-ml-workspace>
+az ml batch-endpoint update -n fetch-everything-pipeline \
+  --set defaults.deployment_name=fetch-everything-v<N-1> -g <rg> -w <ws>
 ```
