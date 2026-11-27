@@ -1,6 +1,6 @@
 # Registering the components
 
-`register.sh` registers the command component`component.yml` and then the pipeline component `pipeline-component.yml`.
+`register.sh` registers the command component `component.yml` and then the pipeline component `pipeline-component.yml`.
 
 The Key Vault URL is kept out of the repo. The script reads it from `KEY_VAULT_URL` and sets it as the registered pipeline component's `key_vault_url` default, so callers that omit that input (ADF, `invoke-test.yml`) keep working. The YAML file itself has no default, so registering it directly without one gives a required input.
 
@@ -25,7 +25,7 @@ The Key Vault URL is kept out of the repo. The script reads it from `KEY_VAULT_U
 1. Create the new deployment without making it the endpoint's default.
 
    ```bash
-   az ml batch-endpoint create -f azureml/deployment.yml -g <rg> -w <ws>
+   az ml batch-deployment create -f azureml/deployment.yml -g <rg> -w <ws>
    ```
 
 2. Invoke it directly, leaving out `key_vault_url` as ADF does:
@@ -37,7 +37,7 @@ The Key Vault URL is kept out of the repo. The script reads it from `KEY_VAULT_U
 3. Only then make it the endpoint's default deployment. Until then the previous deployment keeps serving ADF, and rolling back is a matter of switching the default back.
 
    ```bash
-   az ml batch-endpoint update -n <endpoint> --default-deployment-name <new-deployment> -g <rg> -w <ws>
+   az ml batch-endpoint update -n <endpoint> --set defaults.deployment_name=<new-deployment> -g <rg> -w <ws>
    ```
 
 ## How `register.sh` works
