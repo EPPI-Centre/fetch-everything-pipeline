@@ -12,7 +12,9 @@ inputs:
     description: Text file with one DOI per line, e.g. inbox/<batch-id>.txt.
   key_vault_url:
     type: string
-    default: https://<your-vault-name>.vault.azure.net/
+    description: >-
+      Key Vault holding the provider keys. No default is set here: supply one
+      when registering, or pass it on each invocation.
   mailto:
     type: string
     default: example@example.com
