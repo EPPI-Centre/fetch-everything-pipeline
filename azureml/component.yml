@@ -34,7 +34,10 @@ outputs:
 
 # Settings are passed as environment variables so they
 # show up as editable inputs in Azure ML.
+# Inputs are substituted into this shell command as text, so string inputs
+# are single-quoted and paths double-quoted, each reaching the CLI as one
+# argument. A value containing ' would still break out of its quotes.
 command: >-
-  env KEY_VAULT_URL=${{inputs.key_vault_url}} MAILTO=${{inputs.mailto}}
+  env KEY_VAULT_URL='${{inputs.key_vault_url}}' MAILTO='${{inputs.mailto}}'
   USE_SCOPUS=${{inputs.use_scopus}}
-  fetch-pipeline --input ${{inputs.dois}} --output ${{outputs.results}}
+  fetch-pipeline --input "${{inputs.dois}}" --output "${{outputs.results}}"
