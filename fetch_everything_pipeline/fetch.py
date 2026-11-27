@@ -3,12 +3,12 @@
 import copy
 from json import JSONDecodeError
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import httpx2
 from fer.config import ExternalAPI, external_api_priority
 from fer.fetch_fulltext import (
-    BasePublisherFetcher,
     FullTextBatchFetcher,
     FullTextFetcherError,
     FullTextResult,
@@ -23,6 +23,8 @@ from fetch_everything_pipeline.dois import prepare_dois
 from fetch_everything_pipeline.models import PipelineResult, Status
 from fetch_everything_pipeline.settings import PipelineSettings
 
+if TYPE_CHECKING:
+    from fer.fetching import BasePublisherFetcher
 DEFAULT_CHUNK_SIZE = 50
 
 # Errors that can escape FER's `get_many_fulltext_pdfs_cycling_apis` at the
@@ -72,6 +74,11 @@ def build_fetcher(settings: PipelineSettings) -> FullTextBatchFetcher:
     Scopus is passed to FER's `exclude_api`, so its key and inst token are
     never used.
 
+    FER builds OpenAlex and Crossref fetchers with a fixed 2 second wait
+    so the wait times set here will override that to get more performant
+    retrieval. However, this can bump up against rate limit restrictions
+    from the APIs and may need tuning.
+
     The rest of the processor (the enhancement protocol and its
     storage client) is not used.
 
@@ -92,8 +99,8 @@ def build_fetcher(settings: PipelineSettings) -> FullTextBatchFetcher:
     fetchers: dict[str, BasePublisherFetcher] = (
         fulltext_batch_fetcher.full_text_fetcher.fetchers
     )
-    fetchers["openalex"].wait_time_seconds = settings.wait_time_openalex
-    fetchers["crossref"].wait_time_seconds = settings.wait_time_crossref
+    fetchers[ExternalAPI.OPENALEX.value].wait_time_seconds = settings.wait_time_openalex
+    fetchers[ExternalAPI.CROSSREF.value].wait_time_seconds = settings.wait_time_crossref
     return fulltext_batch_fetcher
 
 
