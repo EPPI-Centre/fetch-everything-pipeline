@@ -1,10 +1,10 @@
 $schema: https://azuremlschemas.azureedge.net/latest/pipelineComponentBatchDeployment.schema.json
 # One deployment per released version of the pipeline component
-name: fetch-everything-v2
+name: fetch-everything-v5
 endpoint_name: fetch-everything-pipeline
-description: Runs version 2 of the eppi_fetch_everything_pipeline pipeline component.
+description: Runs version 5 of the eppi_fetch_everything_pipeline pipeline component.
 type: pipeline
-component: azureml:eppi_fetch_everything_pipeline:2
+component: azureml:eppi_fetch_everything_pipeline:5
 settings:
   default_compute: azureml:eppi-fetch-everything-cpu
   default_datastore: azureml:eppi_fetch_everything_datastore

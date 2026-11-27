@@ -35,6 +35,7 @@ theme:
 
 nav:
   - Overview: index.md
+  - Releasing: deployment.md
   - API Reference: api.md
   - License: LICENSE.md
 

@@ -1,6 +1,7 @@
 """Fetch full texts for input DOIs using FER's batch fetcher."""
 
 import copy
+from json import JSONDecodeError
 from pathlib import Path
 from uuid import UUID
 
@@ -30,6 +31,8 @@ FER_FETCH_ERRORS: tuple[type[Exception], ...] = (
     httpx2.HTTPError,
     OSError,
     ValidationError,
+    JSONDecodeError,
+    UnicodeDecodeError,
 )
 
 

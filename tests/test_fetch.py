@@ -133,7 +133,9 @@ async def test_fetch_fulltexts_failing_chunk_does_not_affect_other_chunks(
     )
 
     assert [r.status for r in results] == [Status.FETCHED, Status.ERROR, Status.FETCHED]
-    assert results[1].error == f"{error_type.__name__}: Error on 10.1000/b"
+    assert results[1].error is not None
+    assert results[1].error.startswith(f"{error_type.__name__}: ")
+    assert "Error on 10.1000/b" in results[1].error
 
 
 async def test_fetch_fulltexts_unexpected_exception_propagates(
