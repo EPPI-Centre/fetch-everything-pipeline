@@ -1,4 +1,4 @@
-"""Define mock functionality and shared helpers for tests."""
+"""Define mock functionality for testing the core fetcher and Key Vault settings."""
 
 import re
 from collections.abc import Awaitable, Callable
@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fer.fetch_fulltext import FullTextResult
 from fer.fetching.core import DOIStudyCollection
+from pydantic import BaseModel, ConfigDict
+from pytest_mock import MockType
 
 FakeFetch = Callable[..., Awaitable[list[FullTextResult]]]
 
@@ -89,3 +91,52 @@ def is_unique_blob_name(blob_name: str | None, path: Path) -> bool:
     """
     pattern = rf"{re.escape(path.stem)}-[0-9a-f]{{32}}\.pdf"
     return blob_name is not None and re.fullmatch(pattern, blob_name) is not None
+
+
+class FakeSecretProperties(BaseModel):
+    """
+    The parts of Key Vault's `SecretProperties` that pydantic-settings reads.
+
+    Attributes:
+        name: The secret's name, e.g. `openalex-key`.
+        enabled: Whether the secret is enabled; disabled secrets are skipped.
+
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    enabled: bool = True
+
+
+class FakeSecret(BaseModel):
+    """
+    The part of Key Vault's `KeyVaultSecret` that pydantic-settings reads.
+
+    Attributes:
+        value: The secret's value.
+
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    value: str
+
+
+def fill_vault(secret_client: MockType, secrets: dict[str, str]) -> None:
+    """
+    Make a mocked `SecretClient` serve `secrets`, keyed by secret name.
+
+    pydantic-settings lists the vault's secrets, reading each one's `name` and
+    `enabled`, then fetches the value of each one it needs with `get_secret`.
+
+    Args:
+        secret_client (MockType): The patched `SecretClient` class.
+        secrets (dict[str, str]): Secret names and their values.
+
+    """
+    client = secret_client.return_value
+    client.list_properties_of_secrets.return_value = [
+        FakeSecretProperties(name=name) for name in secrets
+    ]
+    client.get_secret.side_effect = lambda name: FakeSecret(value=secrets[name])

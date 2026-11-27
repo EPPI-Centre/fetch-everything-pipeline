@@ -12,14 +12,16 @@ from fetch_everything_pipeline import (
     PDF_DIR_NAME,
     RESULTS_FILE_NAME,
     InputFileError,
+    PDFPathError,
     log_summary,
     main,
     parse_args,
     read_dois,
+    relative_pdf_path,
 )
 from fetch_everything_pipeline.fetch import DEFAULT_CHUNK_SIZE
 from fetch_everything_pipeline.models import PipelineResult, Status, read_results
-from fetch_everything_pipeline.settings import PipelineSettings
+from fetch_everything_pipeline.settings import PipelineSettings, SettingsLoadError
 from tests.fakes import is_unique_blob_name, mock_fetch
 
 
@@ -174,15 +176,101 @@ def test_main_writes_results_for_every_input(
         result.status for result in results
     ] == expected_result_status, "results should have the expected statuses"
 
+    fetched_paths = [
+        result.path for result in results if result.status == Status.FETCHED
+    ]
     assert all(
-        result.path is not None for result in results if result.status == Status.FETCHED
+        path is not None for path in fetched_paths
     ), "results for fetched DOIs should have a path"
     assert all(
-        result.path.parent == output / PDF_DIR_NAME
-        for result in results
-        if result.status == Status.FETCHED and result.path is not None
-    ), "results for fetched DOIs should be in the expected PDF directory"
+        path is not None and path.parent == Path(PDF_DIR_NAME) for path in fetched_paths
+    ), "paths should be relative to the output directory, inside the PDF directory"
+    assert all(
+        path is not None and (output / path).is_file() for path in fetched_paths
+    ), "each relative path should point at the fetched PDF under the output directory"
     assert (output / PDF_DIR_NAME).is_dir(), "the PDF directory should be created"
+
+
+@pytest.mark.usefixtures("cli_fetcher_with_pdf")
+def test_main_writes_csv_results_file(input_file: Path, tmp_path: Path):
+    output = tmp_path / "out"
+
+    main(["--input", str(input_file), "--output", str(output)])
+
+    assert RESULTS_FILE_NAME == "results.csv"
+    header = (output / RESULTS_FILE_NAME).read_text(encoding="utf-8").splitlines()[0]
+    assert header.startswith("index,input_doi,"), "results should be a CSV file"
+
+
+def fetched_at(path: Path) -> PipelineResult:
+    return PipelineResult(
+        index=0, input_doi="10.1000/a", status=Status.FETCHED, path=path
+    )
+
+
+def test_relative_pdf_path_is_relative_to_output_dir(tmp_path: Path):
+    output = tmp_path / "out"
+    result = fetched_at(output / PDF_DIR_NAME / "abc.pdf")
+
+    assert (
+        relative_pdf_path(result, output).path == Path(PDF_DIR_NAME) / "abc.pdf"
+    ), "should strip the output directory and keep the rest of the path"
+
+
+def test_relative_pdf_path_keeps_nested_directories(tmp_path: Path):
+    output = tmp_path / "out"
+    result = fetched_at(output / PDF_DIR_NAME / "nested" / "abc.pdf")
+
+    assert (
+        relative_pdf_path(result, output).path
+        == Path(PDF_DIR_NAME) / "nested" / "abc.pdf"
+    ), "should keep any directories below the output directory"
+
+
+def test_relative_pdf_path_handles_relative_output_and_absolute_pdf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    result = fetched_at(tmp_path / "out" / PDF_DIR_NAME / "abc.pdf")
+
+    assert (
+        relative_pdf_path(result, Path("out")).path == Path(PDF_DIR_NAME) / "abc.pdf"
+    ), "should resolve both paths before comparing them"
+
+
+def test_relative_pdf_path_rejects_pdf_outside_output_dir(tmp_path: Path):
+    result = fetched_at(tmp_path / "elsewhere" / "abc.pdf")
+
+    with pytest.raises(PDFPathError, match="is not inside the output directory"):
+        relative_pdf_path(result, tmp_path / "out")
+
+
+def test_relative_pdf_path_leaves_results_without_path_unchanged(tmp_path: Path):
+    result = PipelineResult(index=0, input_doi="10.1000/a", status=Status.NOT_FOUND)
+
+    assert relative_pdf_path(result, tmp_path) is result
+
+
+def test_main_fails_when_pdf_is_outside_output_dir(
+    test_settings: PipelineSettings,
+    mocker: MockerFixture,
+    test_fetcher: FullTextBatchFetcher,
+    input_file: Path,
+    tmp_path: Path,
+):
+    mocker.patch("fetch_everything_pipeline.build_fetcher", return_value=test_fetcher)
+    mocker.patch(
+        "fetch_everything_pipeline.fetch_fulltexts",
+        return_value=[fetched_at(tmp_path / "elsewhere" / "abc.pdf")],
+    )
+    output = tmp_path / "out"
+
+    exit_code = main(["--input", str(input_file), "--output", str(output)])
+
+    assert exit_code == 1, "main() should return 1 when a PDF is outside the output"
+    assert not (
+        output / RESULTS_FILE_NAME
+    ).exists(), "main() should not write results with a misleading path"
 
 
 @pytest.mark.usefixtures("cli_fetcher_with_pdf", "mock_blob_client")
@@ -216,7 +304,7 @@ def test_main_uploads_before_writing_results(
     first_result = read_results(results_path)[0]
     assert first_result.path is not None, "First result should have a path"
     assert (
-        pdf_bytes == first_result.path.read_bytes()
+        pdf_bytes == (output / first_result.path).read_bytes()
     ), "PDF bytes should match the first result's path content"
     assert (
         first_result.blob_name == pdf_blob
@@ -420,6 +508,33 @@ def test_main_fails_on_invalid_settings(
     (
         build_fetcher_mock.assert_not_called(),
         "build_fetcher() should not be called when the settings are invalid",
+    )
+
+
+def test_main_fails_when_key_vault_cannot_be_read(
+    mocker: MockerFixture,
+    test_fetcher: FullTextBatchFetcher,
+    input_file: Path,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+):
+    build_fetcher_mock = mocker.patch(
+        "fetch_everything_pipeline.build_fetcher", return_value=test_fetcher
+    )
+    mocker.patch(
+        "fetch_everything_pipeline.load_settings",
+        side_effect=SettingsLoadError("Cannot read settings from Azure Key Vault"),
+    )
+    output = tmp_path / "out"
+
+    exit_code = main(["--input", str(input_file), "--output", str(output)])
+
+    assert exit_code == 1, "main() should return 1 when Key Vault can't be read"
+    assert "Cannot read settings from Azure Key Vault" in caplog.text
+    assert not output.exists(), "main() should not create the output directory"
+    (
+        build_fetcher_mock.assert_not_called(),
+        "build_fetcher() should not be called when Key Vault can't be read",
     )
 
 
