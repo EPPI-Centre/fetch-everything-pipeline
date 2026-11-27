@@ -102,12 +102,22 @@ az ml batch-endpoint invoke -n fetch-everything-pipeline \
   --deployment-name fetch-everything-vN -f azureml/invoke-test.yml -g <rg> -w <ws>
 ```
 
+A job that completes isn't enough on its own. Per-DOI failures are recorded in `results.csv` and the job still succeeds, so a deployment that fetches nothing would also complete. The test DOI file should include DOIs known to be retrievable, taken from `fetched` rows in a previous run's `results.csv`, with at least one from each provider you expect to use (including OpenAlex).
+
+Download the output folder to check it, for example with `az ml job download`.
+
 The test passes when:
 
-- the job completes and `results.csv` is in the output folder.
-- `std_log.txt` lists the providers you expect (`Enabled providers: ...`).
+- the job completes, and `results.csv` has one row per input line;
+- the known-retrievable DOIs have `status` `fetched`, from the providers you expect (`source`);
+- each `fetched` row's `path` exists under `pdfs/` and is a PDF: `head -c 5 <file>` prints `%PDF-`.
 
-If it fails, the previous deployment is still the default, so callers are unaffected. Fix the problem and release the next version.
+If the known-retrievable DOIs aren't fetched, check the `error` column in `results.csv` and `std_log.txt` (including any "fulltext providers failed" warnings) before deciding
+
+- a transient failure at a provider: invoke again with a new output folder
+- a failure that repeats, or one in this code: don't make the deployment the default
+
+Until step 8, the previous deployment is still the default, so callers are unaffected. Fix the problem and release the next version.
 
 ### 8. Make it the default
 
