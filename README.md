@@ -62,17 +62,19 @@ The container runs as root so it can write to the mounted output directory. This
 
 Settings are read from environment variables or a `.env` file in the working directory:
 
-| Variable                     | Required                                     | Purpose                                            |
-| ---------------------------- | -------------------------------------------- | -------------------------------------------------- |
-| `MAILTO`                     | No (falls back to a default but recommended) | Contact email sent to OpenAlex and Unpaywall.      |
-| `OPENALEX_KEY`               | No (but recommended)                         | OpenAlex API key. Without it, OpenAlex is skipped. |
-| `ELSEVIER_SCOPUS_KEY`        | No                                           | Scopus API key. Without it, Scopus is skipped.     |
-| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus                            | Elsevier institution token.                        |
-| `SCOPUS_PROXY_URL`           | No                                           | Proxy for Scopus requests.                         |
-| `STORAGE_BLOB_ACCOUNT`       | With `--upload`                              | Azure Storage account name.                        |
-| `STORAGE_BLOB_CONTAINER`     | With `--upload`                              | Container to receive the PDFs.                     |
-| `KEY_VAULT_URL`              | No                                           | Azure Key Vault to read the settings above from.   |
-| `USE_SCOPUS`                 | No                                           | `true` to fetch from Scopus. Off by default.       |
+| Variable                     | Required                                     | Purpose                                                         |
+| ---------------------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| `MAILTO`                     | No (falls back to a default but recommended) | Contact email sent to OpenAlex and Unpaywall.                   |
+| `OPENALEX_KEY`               | No (but recommended)                         | OpenAlex API key. Without it, OpenAlex is skipped.              |
+| `ELSEVIER_SCOPUS_KEY`        | No                                           | Scopus API key. Without it, Scopus is skipped.                  |
+| `ELSEVIER_SCOPUS_INST_TOKEN` | Off-campus Scopus                            | Elsevier institution token.                                     |
+| `SCOPUS_PROXY_URL`           | No                                           | Proxy for Scopus requests.                                      |
+| `STORAGE_BLOB_ACCOUNT`       | With `--upload`                              | Azure Storage account name.                                     |
+| `STORAGE_BLOB_CONTAINER`     | With `--upload`                              | Container to receive the PDFs.                                  |
+| `KEY_VAULT_URL`              | No                                           | Azure Key Vault to read the settings above from.                |
+| `USE_SCOPUS`                 | No                                           | `true` to fetch from Scopus. Off by default.                    |
+| `WAIT_TIME_OPENALEX`         | No                                           | Seconds between OpenAlex DOIs. Defaults to 0.0                  |
+| `WAIT_TIME_CROSSREF`         | No                                           | Whole seconds after each Crossref PDF. Defaults to 0 (integer). |
 
 #### Keeping API keys in Azure Key Vault
 
