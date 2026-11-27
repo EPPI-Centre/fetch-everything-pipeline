@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${KEY_VAULT_URL:?Set KEY_VAULT_URL to the deployment's Key Vault URL}"
+: "${KEY_VAULT_URL:?Set KEY_VAULT_URL to the Key Vault URL for this deployment}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
