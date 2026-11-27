@@ -54,20 +54,20 @@ az ml environment create --name eppi-fetch-everything-env --version N \
 
 ### 4. Register the components
 
-Bump `version` in `azureml/component.yml` and `azureml/pipeline-component.yml`. Check that the `mailto` default in `azureml/pipeline-component.yml` is the real contact address, not a placeholder.
+Bump `version` in `azureml/component.yml` and `azureml/pipeline-component.yml`.
 
 Then register both components with `azureml/register.sh`:
 
 ```bash
-KEY_VAULT_URL=https://<vault>.vault.azure.net/ \
+KEY_VAULT_URL=https://<vault>.vault.azure.net/ MAILTO=<contact email> \
   azureml/register.sh -g <rg> -w <ws>
 ```
 
 The script:
 
-- stops if `KEY_VAULT_URL` is unset or empty, and at the first command that fails.
+- stops if `KEY_VAULT_URL` or `MAILTO` is unset or empty, and at the first command that fails.
 - registers the command component first, then the pipeline component. Each refers to the layer below with `@latest`, which is resolved to the most recently registered version when the component is registered. So the environment (step 3) must be registered before the command component, and the command component before the pipeline component.
-- sets `KEY_VAULT_URL` as the registered pipeline component's `key_vault_url` default with `--set`. The vault URL is kept out of the repo, so `pipeline-component.yml` has no default for it. Callers that omit `key_vault_url` (ADF, `invoke-test.yml`) rely on this registered default.
+- sets `KEY_VAULT_URL` and `MAILTO` as the registered pipeline component's `key_vault_url` and `mailto` defaults with `--set`. These are specific to each deployment and kept out of the repo, so `pipeline-component.yml` has no defaults for them. Callers that omit these inputs (ADF, `invoke-test.yml`) rely on the registered defaults.
 - passes any extra arguments, such as `-g` and `-w`, to both `az ml component create` calls.
 
 ### 5. Check what was registered
@@ -77,7 +77,7 @@ az ml component show --name eppi_fetch_everything_pipeline --version N -g <rg> -
 az ml component show --name eppi_fetch_everything --version N -g <rg> -w <ws> --query environment
 ```
 
-`key_vault_url` should have the real vault URL as its default, and the command component's environment should end in `/versions/N` (the environment from step 3). If either is wrong, stop here and register the next version. Nothing is deployed yet.
+`key_vault_url` and `mailto` should have the real vault URL and contact email as their defaults, and the command component's environment should end in `/versions/N` (the environment from step 3). If any of these are wrong, stop here and register the next version before deployment proceeds.
 
 ### 6. Create the deployment
 
