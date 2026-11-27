@@ -127,7 +127,10 @@ def read_results(path: Path) -> list[PipelineResult]:
     """
     Read results from a CSV file written by `write_results`.
 
-    Ignores blank lines.
+    Ignores blank lines. This uses the default field size limit
+    for the csv module, which limits the maximum size of fields
+    it can read to 131072 characters and raises a
+    ResultsProcessingError if a field exceeds this limit.
 
     Args:
         path (Path): Path of the CSV file to read.
