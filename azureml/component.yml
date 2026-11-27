@@ -5,7 +5,7 @@ display_name: Fetch full texts
 description: >-
   Fetch full-text PDFs for a file of DOIs, one per line. Writes results.csv
   (one row per input line) and the PDFs under pdfs/ to the output folder.
-version: "5"
+version: "6"
 is_deterministic: false
 
 environment: azureml:eppi-fetch-everything-env@latest
